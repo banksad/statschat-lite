@@ -87,12 +87,18 @@ def list_datasets() -> list[dict[str, Any]]:
             return cur.fetchall()
 
 
-def search_series(query: str, limit: int = 10) -> list[dict[str, Any]]:
+def search_series(
+    query: str,
+    limit: int = 10,
+    dataset_id: str | None = None,
+) -> list[dict[str, Any]]:
     """
     Search for series using search_text.
 
     This is currently literal metadata search: user terms must match the
     official parsed metadata text.
+
+    If dataset_id is provided, restrict search to that dataset.
     """
     terms = split_query_terms(query)
 
@@ -105,6 +111,10 @@ def search_series(query: str, limit: int = 10) -> list[dict[str, Any]]:
     for term in terms:
         where_clauses.append("s.search_text ILIKE %s")
         params.append(f"%{term}%")
+
+    if dataset_id:
+        where_clauses.append("s.dataset_id = %s")
+        params.append(dataset_id)
 
     where_sql = " AND ".join(where_clauses)
 
@@ -304,14 +314,14 @@ def build_search_response(
     query: str,
     limit: int,
     rows: list[dict[str, Any]],
+    dataset_id: str | None = None,
 ) -> dict[str, Any]:
     """
-    Wrap search results in an API-like response shape.
-
-    This is closer to what FastAPI will eventually return.
+    Build the public API response for search results.
     """
     return {
         "query": query,
+        "dataset_id": dataset_id,
         "limit": limit,
         "count": len(rows),
         "results": rows,
@@ -421,6 +431,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     search_parser.add_argument("query")
     search_parser.add_argument("--limit", type=int, default=10)
+    search_parser.add_argument(
+    "--dataset-id",
+    help="Optional dataset ID to restrict search, for example CPI_GBR.",
+    )
     search_parser.add_argument("--json", action="store_true")
 
     summary_parser = subparsers.add_parser(
@@ -463,7 +477,18 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "search":
-        rows = search_series(args.query, args.limit)
+        rows = search_series(
+                args.query,
+                args.limit,
+                dataset_id=args.dataset_id,
+            )
+
+        response = build_search_response(
+            args.query,
+            args.limit,
+            rows,
+            dataset_id=args.dataset_id,
+        )
 
         if args.json:
             print_json(build_search_response(args.query, args.limit, rows))

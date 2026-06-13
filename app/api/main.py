@@ -1,4 +1,4 @@
-
+from __future__ import annotations
 
 from typing import Any
 
@@ -37,7 +37,8 @@ HOME_PAGE_HTML = """
       line-height: 1.5;
     }
 
-    input {
+    input,
+    select {
       width: 70%;
       padding: 10px;
       font-size: 1rem;
@@ -49,19 +50,19 @@ HOME_PAGE_HTML = """
       cursor: pointer;
     }
 
-    .result {
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      padding: 14px;
-      margin: 14px 0;
-    }
-
     .dataset-summary {
       border: 1px solid #ddd;
       border-radius: 8px;
       padding: 14px;
       margin: 18px 0;
       background: #fafafa;
+    }
+
+    .result {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 14px;
+      margin: 14px 0;
     }
 
     .code {
@@ -88,13 +89,23 @@ HOME_PAGE_HTML = """
   </div>
 
   <form id="search-form">
-    <input
-      id="search-input"
-      type="search"
-      value="real gdp"
-      placeholder="Try: real gdp, household, imports"
-    >
-    <button type="submit">Search</button>
+    <p>
+      <label for="dataset-select">Dataset</label><br>
+      <select id="dataset-select">
+        <option value="">All datasets</option>
+      </select>
+    </p>
+
+    <p>
+      <label for="search-input">Search terms</label><br>
+      <input
+        id="search-input"
+        type="search"
+        value="real gdp"
+        placeholder="Try: real gdp, consumer price, retail price, imports"
+      >
+      <button type="submit">Search</button>
+    </p>
   </form>
 
   <p class="muted">
@@ -107,6 +118,7 @@ HOME_PAGE_HTML = """
   <script>
     const form = document.getElementById("search-form");
     const input = document.getElementById("search-input");
+    const datasetSelect = document.getElementById("dataset-select");
     const resultsDiv = document.getElementById("results");
     const datasetSummaryDiv = document.getElementById("dataset-summary");
 
@@ -132,6 +144,15 @@ HOME_PAGE_HTML = """
       }
 
       const data = await response.json();
+
+      datasetSelect.innerHTML = `
+        <option value="">All datasets</option>
+        ${data.datasets.map(dataset => `
+          <option value="${dataset.dataset_id}">
+            ${dataset.dataset_id} — ${dataset.dataset_title}
+          </option>
+        `).join("")}
+      `;
 
       if (data.datasets.length === 0) {
         datasetSummaryDiv.innerHTML = "<p>No datasets are currently loaded.</p>";
@@ -169,7 +190,14 @@ HOME_PAGE_HTML = """
     async function runSearch(query) {
       resultsDiv.innerHTML = "<p>Searching...</p>";
 
-      const url = `/v1/series/search?q=${encodeURIComponent(query)}&limit=5`;
+      const selectedDatasetId = datasetSelect.value;
+
+      let url = `/v1/series/search?q=${encodeURIComponent(query)}&limit=5`;
+
+      if (selectedDatasetId) {
+        url += `&dataset_id=${encodeURIComponent(selectedDatasetId)}`;
+      }
+
       const response = await fetch(url);
 
       if (!response.ok) {
@@ -180,12 +208,19 @@ HOME_PAGE_HTML = """
       const data = await response.json();
 
       if (data.results.length === 0) {
-        resultsDiv.innerHTML = "<p>No results found.</p>";
+        const datasetLabel = selectedDatasetId || "all datasets";
+
+        resultsDiv.innerHTML = `
+          <h2>Results for "${data.query}" in ${datasetLabel}</h2>
+          <p>No results found.</p>
+        `;
         return;
       }
 
+      const datasetLabel = selectedDatasetId || "all datasets";
+
       resultsDiv.innerHTML = `
-        <h2>Results for "${data.query}"</h2>
+        <h2>Results for "${data.query}" in ${datasetLabel}</h2>
         ${data.results.map(result => `
           <div class="result">
             <h3>${result.indicator_name}</h3>
@@ -236,8 +271,13 @@ HOME_PAGE_HTML = """
       runSearch(input.value);
     });
 
-    loadDatasetSummary();
-    runSearch(input.value);
+    datasetSelect.addEventListener("change", () => {
+      runSearch(input.value);
+    });
+
+    loadDatasetSummary().then(() => {
+      runSearch(input.value);
+    });
   </script>
 </body>
 </html>
@@ -290,15 +330,30 @@ def search_series_endpoint(
         le=50,
         description="Maximum number of series results to return.",
     ),
+    dataset_id: str | None = Query(
+        None,
+        description="Optional dataset ID to restrict search, for example CPI_GBR.",
+    ),
 ) -> dict[str, Any]:
     """
     Search for statistical series.
 
-    Example:
+    Examples:
         /v1/series/search?q=real%20gdp&limit=3
+        /v1/series/search?q=price&dataset_id=CPI_GBR
     """
-    rows = search_series(q, limit)
-    return build_search_response(q, limit, rows)
+    rows = search_series(
+        q,
+        limit,
+        dataset_id=dataset_id,
+    )
+
+    return build_search_response(
+        q,
+        limit,
+        rows,
+        dataset_id=dataset_id,
+    )
 
 
 @app.get("/v1/datasets/{dataset_id}/series/by-indicator/{indicator_code}")
