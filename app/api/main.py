@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Path, Query
+from fastapi.responses import HTMLResponse
 
 from scripts.query_postgres import (
     build_observations_by_indicator_response,
@@ -18,6 +19,155 @@ app = FastAPI(
     description="A lightweight API for discovering public ONS/IMF SDMX series.",
     version="0.1.0",
 )
+
+
+HOME_PAGE_HTML = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ONS StatsChat Lite</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 20px;
+      line-height: 1.5;
+    }
+
+    input {
+      width: 70%;
+      padding: 10px;
+      font-size: 1rem;
+    }
+
+    button {
+      padding: 10px 14px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    .result {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 14px;
+      margin: 14px 0;
+    }
+
+    .code {
+      font-family: monospace;
+      background: #f5f5f5;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+
+    .muted {
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <h1>ONS StatsChat Lite</h1>
+
+  <p>
+    Search public ONS/IMF SDMX series metadata.
+  </p>
+
+  <form id="search-form">
+    <input
+      id="search-input"
+      type="search"
+      value="real gdp"
+      placeholder="Try: real gdp, household, imports"
+    >
+    <button type="submit">Search</button>
+  </form>
+
+  <p class="muted">
+    This page calls the local FastAPI endpoint:
+    <span class="code">/v1/series/search</span>
+  </p>
+
+  <div id="results"></div>
+
+  <script>
+    const form = document.getElementById("search-form");
+    const input = document.getElementById("search-input");
+    const resultsDiv = document.getElementById("results");
+
+    async function runSearch(query) {
+      resultsDiv.innerHTML = "<p>Searching...</p>";
+
+      const url = `/v1/series/search?q=${encodeURIComponent(query)}&limit=5`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        resultsDiv.innerHTML = `<p>Search failed: ${response.status}</p>`;
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.results.length === 0) {
+        resultsDiv.innerHTML = "<p>No results found.</p>";
+        return;
+      }
+
+      resultsDiv.innerHTML = `
+        <h2>Results for “${data.query}”</h2>
+        ${data.results.map(result => `
+          <div class="result">
+            <h3>${result.indicator_name}</h3>
+            <p>
+              Indicator:
+              <span class="code">${result.indicator_code}</span>
+            </p>
+            <p>
+              Dataset:
+              <span class="code">${result.dataset_id}</span>
+            </p>
+            <p>
+              Frequency: ${result.frequency_name}
+              |
+              Period: ${result.first_period} to ${result.latest_period}
+              |
+              Observations: ${result.observation_count}
+            </p>
+            <p>
+              <a href="/v1/datasets/${result.dataset_id}/series/by-indicator/${result.indicator_code}" target="_blank">
+                View metadata JSON
+              </a>
+              |
+              <a href="/v1/datasets/${result.dataset_id}/series/by-indicator/${result.indicator_code}/observations?limit=5" target="_blank">
+                View first 5 observations JSON
+              </a>
+            </p>
+          </div>
+        `).join("")}
+      `;
+    }
+
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      runSearch(input.value);
+    });
+
+    runSearch(input.value);
+  </script>
+</body>
+</html>
+"""
+
+
+@app.get("/", response_class=HTMLResponse)
+def home_page() -> str:
+    """
+    Tiny browser UI for searching series metadata.
+
+    This is intentionally simple: one HTML page calling our JSON API.
+    """
+    return HOME_PAGE_HTML
 
 
 @app.get("/health")
