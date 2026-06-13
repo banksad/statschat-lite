@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from typing import Any
 
@@ -38,11 +39,21 @@ def split_query_terms(query: str) -> list[str]:
     ]
 
 
+def print_json(data: Any) -> None:
+    """
+    Print data as pretty JSON.
+
+    default=str handles values like Decimal, which the standard JSON
+    module cannot serialise automatically.
+    """
+    print(json.dumps(data, indent=2, default=str))
+
+
 def search_series(query: str, limit: int = 10) -> list[dict[str, Any]]:
     """
     Search for series whose search_text contains all query terms.
 
-    This is still simple keyword search, but now it is backed by Postgres.
+    This is simple keyword search, backed by Postgres.
     """
     terms = split_query_terms(query)
 
@@ -58,8 +69,10 @@ def search_series(query: str, limit: int = 10) -> list[dict[str, Any]]:
     sql = f"""
         SELECT
             s.series_id,
+            s.dataset_id,
             s.dimension_values ->> 'INDICATOR' AS indicator_code,
             s.dimension_labels -> 'INDICATOR' ->> 'name' AS indicator_name,
+            s.dimension_values ->> 'FREQ' AS frequency_code,
             s.dimension_labels -> 'FREQ' ->> 'name' AS frequency_name,
             MIN(o.time_period) AS first_period,
             MAX(o.time_period) AS latest_period,
@@ -70,8 +83,10 @@ def search_series(query: str, limit: int = 10) -> list[dict[str, Any]]:
         WHERE {where_sql}
         GROUP BY
             s.series_id,
+            s.dataset_id,
             s.dimension_values ->> 'INDICATOR',
             s.dimension_labels -> 'INDICATOR' ->> 'name',
+            s.dimension_values ->> 'FREQ',
             s.dimension_labels -> 'FREQ' ->> 'name'
         ORDER BY
             s.series_id
@@ -143,6 +158,40 @@ def get_series_observations(
             return list(cur.fetchall())
 
 
+def build_search_response(
+    query: str,
+    limit: int,
+    rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """
+    Wrap search results in an API-like response shape.
+
+    This is closer to what FastAPI will eventually return.
+    """
+    return {
+        "query": query,
+        "limit": limit,
+        "count": len(rows),
+        "results": rows,
+    }
+
+
+def build_observations_response(
+    series_id: int,
+    limit: int,
+    rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """
+    Wrap observation rows in an API-like response shape.
+    """
+    return {
+        "series_id": series_id,
+        "limit": limit,
+        "count": len(rows),
+        "observations": rows,
+    }
+
+
 def print_search_results(rows: list[dict[str, Any]]) -> None:
     """Print search results in a readable terminal format."""
     if not rows:
@@ -193,8 +242,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     This lets us run:
         python3 scripts/query_postgres.py search "real gdp"
+        python3 scripts/query_postgres.py search "real gdp" --json
         python3 scripts/query_postgres.py summary 11
+        python3 scripts/query_postgres.py summary 11 --json
         python3 scripts/query_postgres.py observations 11 --limit 5
+        python3 scripts/query_postgres.py observations 11 --limit 5 --json
     """
     parser = argparse.ArgumentParser(
         description="Query the local ONS SDMX Postgres database."
@@ -211,12 +263,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     search_parser.add_argument("query")
     search_parser.add_argument("--limit", type=int, default=10)
+    search_parser.add_argument("--json", action="store_true")
 
     summary_parser = subparsers.add_parser(
         "summary",
         help="Show summary metadata for one series.",
     )
     summary_parser.add_argument("series_id", type=int)
+    summary_parser.add_argument("--json", action="store_true")
 
     observations_parser = subparsers.add_parser(
         "observations",
@@ -224,6 +278,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     observations_parser.add_argument("series_id", type=int)
     observations_parser.add_argument("--limit", type=int, default=10)
+    observations_parser.add_argument("--json", action="store_true")
 
     return parser
 
@@ -234,15 +289,33 @@ def main() -> None:
 
     if args.command == "search":
         rows = search_series(args.query, args.limit)
-        print_search_results(rows)
+
+        if args.json:
+            print_json(build_search_response(args.query, args.limit, rows))
+        else:
+            print_search_results(rows)
 
     elif args.command == "summary":
         row = get_series_summary(args.series_id)
-        print_summary(row)
+
+        if args.json:
+            print_json(row)
+        else:
+            print_summary(row)
 
     elif args.command == "observations":
         rows = get_series_observations(args.series_id, args.limit)
-        print_observations(rows)
+
+        if args.json:
+            print_json(
+                build_observations_response(
+                    args.series_id,
+                    args.limit,
+                    rows,
+                )
+            )
+        else:
+            print_observations(rows)
 
 
 if __name__ == "__main__":
