@@ -223,13 +223,19 @@ def series_page(
             ),
         )
 
-    observations = get_series_observations_by_indicator(
+    table_observations = get_series_observations_by_indicator(
         dataset_id,
         indicator_code,
         20,
     )
 
-    chart = build_line_chart_data(observations)
+    chart_observations = get_series_observations_by_indicator(
+        dataset_id,
+        indicator_code,
+        500,
+    )
+
+    chart = build_line_chart_data(chart_observations)
 
     encoded_dataset_id = quote(dataset_id, safe="")
     encoded_indicator_code = quote(indicator_code, safe="")
@@ -244,7 +250,7 @@ def series_page(
         name="series.html",
         context={
             "summary": summary,
-            "observations": observations,
+            "observations": table_observations,
             "chart": chart,
             "metadata_url": metadata_url,
             "observations_url": observations_url,

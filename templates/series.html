@@ -157,8 +157,8 @@
       </div>
 
       <p class="chart-caption">
-        {{ chart.first_period }} to {{ chart.latest_period }}.
-        Displayed range: {{ chart.min_value }} to {{ chart.max_value }}.
+	  Chart shows up to 500 observations from {{ chart.first_period }} to {{ chart.latest_period }}.
+	  Displayed range: {{ chart.min_value }} to {{ chart.max_value }}.
       </p>
     {% else %}
       <p>No numeric observations available for charting.</p>
@@ -166,7 +166,7 @@
   </div>
 
 
-  <h2>First 20 observations</h2>
+  <h2>First 20 observations table</h2>
 
   <table>
     <thead>
