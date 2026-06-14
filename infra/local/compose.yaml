@@ -3,13 +3,26 @@ services:
     image: postgres:16
     container_name: ons-sdmx-postgres
     environment:
-      POSTGRES_DB: ons_sdmx
-      POSTGRES_USER: ons_sdmx_user
-      POSTGRES_PASSWORD: ons_sdmx_password
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5433:5432"
+      - "${POSTGRES_HOST_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: ons-sdmx-api
+    environment:
+      ONS_SDMX_DB_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+
 volumes:
   postgres_data:
+
