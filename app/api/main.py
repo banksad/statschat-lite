@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from html import escape
 from pathlib import Path as FilePath
 from typing import Any
 
@@ -45,12 +46,86 @@ def home_page() -> str:
     return read_template("index.html")
 
 
-@app.get("/series", response_class=HTMLResponse)
-def series_page() -> str:
+def render_series_page(
+    summary: dict[str, Any],
+    observations: list[dict[str, Any]],
+) -> str:
+    rows_html = "".join(
+        "<tr>"
+        f"<td>{escape(str(row.get('time_period', '')))}</td>"
+        f"<td>{escape(str(row.get('obs_value', '')))}</td>"
+        "</tr>"
+        for row in observations
+    )
+
+    if not rows_html:
+        rows_html = '<tr><td colspan="2">No observations found.</td></tr>'
+
+    template = read_template("series.html")
+
+    replacements = {
+        "{{ dataset_id }}": escape(str(summary.get("dataset_id", ""))),
+        "{{ dataset_title }}": escape(str(summary.get("dataset_title", "") or "")),
+        "{{ indicator_code }}": escape(str(summary.get("indicator_code", ""))),
+        "{{ indicator_name }}": escape(str(summary.get("indicator_name", ""))),
+        "{{ frequency_name }}": escape(str(summary.get("frequency_name", "") or "")),
+        "{{ first_period }}": escape(str(summary.get("first_period", "") or "")),
+        "{{ latest_period }}": escape(str(summary.get("latest_period", "") or "")),
+        "{{ observation_count }}": escape(
+            str(summary.get("observation_count", "") or "")
+        ),
+        "{{ metadata_url }}": escape(
+            f"/v1/datasets/{summary.get('dataset_id', '')}"
+            f"/series/by-indicator/{summary.get('indicator_code', '')}",
+            quote=True,
+        ),
+        "{{ observations_url }}": escape(
+            f"/v1/datasets/{summary.get('dataset_id', '')}"
+            f"/series/by-indicator/{summary.get('indicator_code', '')}"
+            "/observations?limit=20",
+            quote=True,
+        ),
+        "{{ observations_rows }}": rows_html,
+    }
+
+    for placeholder, value in replacements.items():
+        template = template.replace(placeholder, value)
+
+    return template
+
+
+@app.get("/series/{dataset_id}/{indicator_code}", response_class=HTMLResponse)
+def series_page(
+    dataset_id: str = Path(
+        ...,
+        description="Dataset ID, for example NAG_GBR.",
+    ),
+    indicator_code: str = Path(
+        ...,
+        description="SDMX indicator code, for example NGDP_R_SA_XDC.",
+    ),
+) -> str:
     """
-    Tiny browser page for series API links.
+    Friendly browser page for one series.
     """
-    return read_template("series.html")
+    summary = get_series_summary_by_indicator(dataset_id, indicator_code)
+
+    if summary is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Series not found for dataset_id={dataset_id} "
+                f"and indicator_code={indicator_code}."
+            ),
+        )
+
+    observations = get_series_observations_by_indicator(
+        dataset_id,
+        indicator_code,
+        20,
+    )
+
+    return render_series_page(summary, observations)
 
 
 @app.get("/health")

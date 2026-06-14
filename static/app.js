@@ -132,6 +132,10 @@ async function runSearch(query) {
         </p>
 
         <p>
+          <a href="/series/${result.dataset_id}/${result.indicator_code}">
+            View series page
+          </a>
+          |
           <a href="/v1/datasets/${result.dataset_id}/series/by-indicator/${result.indicator_code}" target="_blank">
             View metadata JSON
           </a>
