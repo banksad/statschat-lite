@@ -1,6 +1,6 @@
-# ONS StatsChat Lite
+# StatsChat Lite
 
-**ONS StatsChat Lite** is an experimental lightweight application for discovering, inspecting, and retrieving official statistical series.
+**StatsChat Lite** is an experimental lightweight application for discovering, inspecting, and retrieving official statistical series.
 
 The project explores a simple idea:
 
