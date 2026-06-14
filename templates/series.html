@@ -39,65 +39,18 @@
     </p>
   </div>
 
-  <h2>First 20 observations</h2>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Period</th>
-        <th>Value</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for observation in observations %}
-      <tr>
-        <td>{{ observation.time_period }}</td>
-        <td>{{ observation.obs_value }}</td>
-      </tr>
-      {% else %}
-      <tr>
-        <td colspan="2">No observations found.</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  
   <h2>Source and provenance</h2>
 
   <div class="result">
     <p>
-      <strong>Dataset:</strong>
-      <span class="code">{{ summary.dataset_id }}</span>
-      {% if summary.dataset_title %}
-        — {{ summary.dataset_title }}
-      {% endif %}
-    </p>
-
-    <p>
-      <strong>Indicator:</strong>
-      <span class="code">{{ summary.indicator_code }}</span>
-      — {{ summary.indicator_name }}
+      <strong>Structure:</strong>
+      <span class="code">{{ summary.structure_ref }}</span>
     </p>
 
     <p>
       <strong>Series key:</strong>
       <span class="code">{{ summary.series_key }}</span>
-    </p>
-
-    <p>
-      <strong>Frequency:</strong>
-      {{ summary.frequency_name }}
-      |
-      <strong>Period coverage:</strong>
-      {{ summary.first_period }} to {{ summary.latest_period }}
-      |
-      <strong>Observations:</strong>
-      {{ summary.observation_count }}
-    </p>
-
-    <p>
-      <strong>Structure:</strong>
-      <span class="code">{{ summary.structure_ref }}</span>
     </p>
 
     <p>
@@ -138,5 +91,30 @@
       </a>
     </p>
   </div>
+
+
+  <h2>First 20 observations</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Period</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for observation in observations %}
+      <tr>
+        <td>{{ observation.time_period }}</td>
+        <td>{{ observation.obs_value }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="2">No observations found.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  
 </body>
 </html>
