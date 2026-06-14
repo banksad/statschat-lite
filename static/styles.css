@@ -44,3 +44,44 @@ button {
 .muted {
   color: #666;
 }
+
+.chart-container {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.series-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.chart-axis {
+  stroke: #8c959f;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-grid {
+  stroke: #d0d7de;
+  stroke-width: 1;
+  opacity: 0.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-x-label,
+.chart-y-label {
+  font-size: 0.85rem;
+  fill: currentColor;
+}
+
+.chart-caption {
+  font-size: 0.9rem;
+}

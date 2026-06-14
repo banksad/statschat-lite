@@ -92,6 +92,79 @@
     </p>
   </div>
 
+  <h2>Chart</h2>
+
+  <div class="result">
+    {% if chart.has_data %}
+      <div class="chart-container">
+        <svg
+          class="series-chart"
+          viewBox="0 0 {{ chart.width }} {{ chart.height }}"
+          role="img"
+          aria-label="{{ summary.indicator_name }} from {{ chart.first_period }} to {{ chart.latest_period }}"
+        >
+          <line
+            class="chart-axis"
+            x1="{{ chart.plot_left }}"
+            y1="{{ chart.plot_bottom }}"
+            x2="{{ chart.plot_right }}"
+            y2="{{ chart.plot_bottom }}"
+          />
+
+          <line
+            class="chart-axis"
+            x1="{{ chart.plot_left }}"
+            y1="{{ chart.plot_top }}"
+            x2="{{ chart.plot_left }}"
+            y2="{{ chart.plot_bottom }}"
+          />
+
+          {% for tick in chart.y_ticks %}
+            <line
+              class="chart-grid"
+              x1="{{ chart.plot_left }}"
+              y1="{{ tick.y }}"
+              x2="{{ chart.plot_right }}"
+              y2="{{ tick.y }}"
+            />
+            <text
+              class="chart-y-label"
+              x="{{ chart.plot_left - 10 }}"
+              y="{{ tick.y }}"
+              text-anchor="end"
+              dominant-baseline="middle"
+            >
+              {{ tick.label }}
+            </text>
+          {% endfor %}
+
+          {% for tick in chart.x_ticks %}
+            <text
+              class="chart-x-label"
+              x="{{ tick.x }}"
+              y="{{ chart.plot_bottom + 28 }}"
+              text-anchor="{{ tick.anchor }}"
+            >
+              {{ tick.label }}
+            </text>
+          {% endfor %}
+
+          <polyline
+            class="chart-line"
+            points="{{ chart.points }}"
+          />
+        </svg>
+      </div>
+
+      <p class="chart-caption">
+        {{ chart.first_period }} to {{ chart.latest_period }}.
+        Displayed range: {{ chart.min_value }} to {{ chart.max_value }}.
+      </p>
+    {% else %}
+      <p>No numeric observations available for charting.</p>
+    {% endif %}
+  </div>
+
 
   <h2>First 20 observations</h2>
 
