@@ -1,6 +1,8 @@
 CREATE TABLE IF NOT EXISTS datasets (
     dataset_id TEXT PRIMARY KEY,
     title TEXT,
+    data_domain_code TEXT,
+    data_domain_label TEXT,
     source_url TEXT NOT NULL,
     documentation_url TEXT,
     metadata_url TEXT,
@@ -8,6 +10,12 @@ CREATE TABLE IF NOT EXISTS datasets (
     raw_file_path TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE datasets
+    ADD COLUMN IF NOT EXISTS data_domain_code TEXT;
+
+ALTER TABLE datasets
+    ADD COLUMN IF NOT EXISTS data_domain_label TEXT;
 
 CREATE TABLE IF NOT EXISTS series (
     series_id BIGSERIAL PRIMARY KEY,

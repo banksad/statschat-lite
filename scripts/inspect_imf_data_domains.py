@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
+from typing import Any
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -60,13 +61,13 @@ def parse_codelist(xml_bytes: bytes) -> dict[str, str]:
     return codes
 
 
-def dataset_domain_code(dataset_id: str) -> str:
-    """
-    Split dataset IDs such as NAG_GBR into NAG + GBR.
+def dataset_domain_code(dataset: dict[str, Any]) -> str:
+    configured_code = dataset.get("data_domain_code")
 
-    For now we only need the data-domain part.
-    """
-    return dataset_id.rsplit("_", 1)[0]
+    if configured_code:
+        return configured_code
+
+    return dataset["dataset_id"].rsplit("_", 1)[0]
 
 
 def main() -> None:
@@ -81,7 +82,7 @@ def main() -> None:
 
     for dataset in datasets:
         dataset_id = dataset["dataset_id"]
-        domain_code = dataset_domain_code(dataset_id)
+        domain_code = dataset_domain_code(dataset)
         domain_label = domain_codes.get(domain_code)
 
         print(dataset_id)

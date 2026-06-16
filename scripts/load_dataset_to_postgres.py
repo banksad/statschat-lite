@@ -47,16 +47,20 @@ def insert_dataset(cur, dataset_config: dict[str, Any]) -> None:
         INSERT INTO datasets (
             dataset_id,
             title,
+            data_domain_code,
+            data_domain_label,
             source_url,
             documentation_url,
             metadata_url,
             structure_ref,
             raw_file_path
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (dataset_id)
         DO UPDATE SET
             title = EXCLUDED.title,
+            data_domain_code = EXCLUDED.data_domain_code,
+            data_domain_label = EXCLUDED.data_domain_label,
             source_url = EXCLUDED.source_url,
             documentation_url = EXCLUDED.documentation_url,
             metadata_url = EXCLUDED.metadata_url,
@@ -69,6 +73,8 @@ def insert_dataset(cur, dataset_config: dict[str, Any]) -> None:
         (
             dataset_config["dataset_id"],
             dataset_config["title"],
+            dataset_config["data_domain_code"],
+            dataset_config["data_domain_label"],
             dataset_config["source_url"],
             dataset_config.get("documentation_url"),
             dataset_config.get("metadata_url"),

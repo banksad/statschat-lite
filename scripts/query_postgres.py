@@ -86,6 +86,8 @@ def list_datasets() -> list[dict[str, Any]]:
         SELECT
             d.dataset_id,
             d.title AS dataset_title,
+            d.data_domain_code,
+            d.data_domain_label,
             d.source_url,
             d.documentation_url,
             d.metadata_url,
