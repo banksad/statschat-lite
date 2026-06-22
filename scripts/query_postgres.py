@@ -116,6 +116,111 @@ def list_datasets() -> list[dict[str, Any]]:
             return cur.fetchall()
 
 
+def get_dataset(dataset_id: str) -> dict[str, Any] | None:
+    """
+    Return one dataset by public dataset_id.
+
+    Browse v1 uses curated navigation, but this page content is source-backed:
+    dataset metadata and counts come from the database.
+    """
+    sql = """
+        SELECT
+            d.dataset_id,
+            d.title AS dataset_title,
+            d.data_domain_code,
+            d.data_domain_label,
+            d.source_url,
+            d.documentation_url,
+            d.metadata_url,
+            d.structure_ref,
+            COUNT(DISTINCT s.series_id) AS series_count,
+            COUNT(o.observation_id) AS observation_count
+        FROM datasets d
+        LEFT JOIN series s
+            ON s.dataset_id = d.dataset_id
+        LEFT JOIN observations o
+            ON o.series_id = s.series_id
+        WHERE d.dataset_id = %s
+        GROUP BY
+            d.dataset_id,
+            d.title,
+            d.data_domain_code,
+            d.data_domain_label,
+            d.source_url,
+            d.documentation_url,
+            d.metadata_url,
+            d.structure_ref;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (dataset_id,))
+            return cur.fetchone()
+
+
+def list_series_for_dataset(
+    dataset_id: str,
+    limit: int = 500,
+) -> list[dict[str, Any]]:
+    """
+    Return series belonging to one dataset.
+
+    The series table stores SDMX-derived metadata in JSONB fields. We extract
+    the most useful public-facing fields here so the template can stay simple.
+    """
+    sql = """
+        SELECT
+            s.series_id,
+            s.dataset_id,
+            d.title AS dataset_title,
+            d.source_url,
+            d.documentation_url,
+            d.metadata_url,
+            d.structure_ref,
+            s.series_key,
+            s.dimension_values ->> 'INDICATOR' AS indicator_code,
+            s.dimension_labels -> 'INDICATOR' ->> 'name' AS indicator_name,
+            s.dimension_values ->> 'FREQ' AS frequency_code,
+            s.dimension_labels -> 'FREQ' ->> 'name' AS frequency_name,
+            MIN(o.time_period) AS first_period,
+            MAX(o.time_period) AS latest_period,
+            COUNT(o.observation_id) AS observation_count
+        FROM series s
+        JOIN datasets d
+            ON d.dataset_id = s.dataset_id
+        LEFT JOIN observations o
+            ON o.series_id = s.series_id
+        WHERE s.dataset_id = %s
+        GROUP BY
+            s.series_id,
+            s.dataset_id,
+            d.title,
+            d.source_url,
+            d.documentation_url,
+            d.metadata_url,
+            d.structure_ref,
+            s.series_key,
+            s.dimension_values ->> 'INDICATOR',
+            s.dimension_labels -> 'INDICATOR' ->> 'name',
+            s.dimension_values ->> 'FREQ',
+            s.dimension_labels -> 'FREQ' ->> 'name'
+        ORDER BY
+            LOWER(
+                COALESCE(
+                    s.dimension_labels -> 'INDICATOR' ->> 'name',
+                    s.dimension_values ->> 'INDICATOR',
+                    s.series_key
+                )
+            )
+        LIMIT %s;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (dataset_id, limit))
+            return list(cur.fetchall())
+
+
 def search_series(
     query: str,
     limit: int = 10,

@@ -13,9 +13,11 @@ from scripts.query_postgres import (
     build_observations_by_indicator_response,
     build_search_response,
     get_database_health,
+    get_dataset,
     get_series_observations_by_indicator,
     get_series_summary_by_indicator,
     list_datasets,
+    list_series_for_dataset,
     search_series,
 )
 
@@ -223,6 +225,41 @@ def browse_page(request: Request) -> HTMLResponse:
         request=request,
         name="browse.html",
         context={
+            "active_nav": "browse",
+        },
+    )
+
+@app.get("/browse/datasets/{dataset_id}", response_class=HTMLResponse)
+def browse_dataset_page(
+    request: Request,
+    dataset_id: str = Path(
+        ...,
+        description="Dataset ID, for example NAG_GBR.",
+    ),
+) -> HTMLResponse:
+    """
+    Lightweight dataset Browse page.
+
+    Browse v1 is deliberately simple:
+    curated topic page -> source-backed dataset page -> existing series pages.
+    """
+    dataset = get_dataset(dataset_id)
+
+    if dataset is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Dataset not found for dataset_id={dataset_id}.",
+        )
+
+    series = list_series_for_dataset(dataset_id, limit=500)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="browse_dataset.html",
+        context={
+            "dataset": dataset,
+            "series": series,
+            "series_count": len(series),
             "active_nav": "browse",
         },
     )

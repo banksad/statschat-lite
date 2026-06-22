@@ -12,25 +12,58 @@
 
   <main class="page">
     <section class="hero">
-      <p class="eyebrow">Structured discovery</p>
+      <p class="eyebrow">Browse</p>
       <h1>Browse official statistics by topic</h1>
       <p>
-        Browse will let users move from broad statistical topics to meaningful
-        groups of source-backed series.
+        Explore source-backed official statistical datasets through a small,
+        curated topic tree.
       </p>
     </section>
 
     <section class="card">
-      <h2>Coming next</h2>
+      <h2>Topics</h2>
+
+      <nav aria-label="Browse official statistics">
+        <ul class="browse-tree">
+          <li>
+            <strong>Economy</strong>
+            <ul>
+              <li>
+                <a href="/browse/datasets/NAG_GBR">UK National Accounts</a>
+              </li>
+              <li>
+                <a href="/browse/datasets/BOP_GBR">UK Balance of Payments</a>
+              </li>
+              <li>
+                <a href="/browse/datasets/SBS_GBR">UK Sectoral Balance Sheet</a>
+              </li>
+            </ul>
+          </li>
+
+          <li>
+            <strong>Prices</strong>
+            <ul>
+              <li>
+                <a href="/browse/datasets/CPI_GBR">UK Consumer Price Index</a>
+              </li>
+            </ul>
+          </li>
+        </ul>
+      </nav>
+    </section>
+
+    <section class="card">
+      <h2>About this browse tree</h2>
       <p>
-        This page will eventually show a lightweight discovery tree, such as:
+        This navigation is curated by Stats Finder. The dataset pages, series
+        metadata, and observations are loaded from official source-backed SDMX
+        data in the database.
       </p>
 
-      <pre>Economy
-  National accounts
-    Gross value added
-      GVA by industry
-        Download all series</pre>
+      <p>
+        Browse is deliberately simple at this stage: topic to dataset, dataset
+        to series, series to observations.
+      </p>
     </section>
   </main>
 </body>
