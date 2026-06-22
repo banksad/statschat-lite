@@ -3,10 +3,16 @@ const input = document.getElementById("search-input");
 const datasetSelect = document.getElementById("dataset-select");
 const resultsDiv = document.getElementById("results");
 const datasetSummaryDiv = document.getElementById("dataset-summary");
+const searchModeSelect = document.getElementById("search-mode");
 
 const urlParams = new URLSearchParams(window.location.search);
 const initialDatasetId = urlParams.get("dataset_id") || "";
 const initialQuery = urlParams.get("q");
+const initialMode = urlParams.get("mode") || "semantic";
+
+if (searchModeSelect) {
+  searchModeSelect.value = initialMode;
+}
 
 if (initialQuery !== null) {
   input.value = initialQuery;
@@ -40,8 +46,12 @@ function externalLink(url, label) {
   `;
 }
 
-function updateSearchUrl(query, datasetId) {
+function updateSearchUrl(query, datasetId, mode) {
   const params = new URLSearchParams();
+
+  if (mode) {
+    params.set("mode", mode);
+  }
 
   if (query) {
     params.set("q", query);
@@ -133,13 +143,15 @@ async function loadDatasetSummary() {
   `;
 }
 
+
 async function runSearch(query, options = {}) {
   const updateUrl = options.updateUrl ?? true;
   const trimmedQuery = query.trim();
   const selectedDatasetId = datasetSelect.value;
+  const selectedMode = searchModeSelect ? searchModeSelect.value : "keyword";
 
   if (updateUrl) {
-    updateSearchUrl(trimmedQuery, selectedDatasetId);
+    updateSearchUrl(trimmedQuery, selectedDatasetId, selectedMode);
   }
 
   if (!trimmedQuery) {
@@ -149,7 +161,13 @@ async function runSearch(query, options = {}) {
 
   resultsDiv.innerHTML = "<p>Searching...</p>";
 
-  let url = `/v1/series/search?q=${encodeURIComponent(trimmedQuery)}&limit=10`;
+  let url;
+
+  if (selectedMode === "semantic") {
+    url = `/v1/series/search/semantic?q=${encodeURIComponent(trimmedQuery)}&limit=10`;
+  } else {
+    url = `/v1/series/search?q=${encodeURIComponent(trimmedQuery)}&limit=10`;
+  }
 
   if (selectedDatasetId) {
     url += `&dataset_id=${encodeURIComponent(selectedDatasetId)}`;
@@ -164,17 +182,18 @@ async function runSearch(query, options = {}) {
 
   const data = await response.json();
   const datasetLabel = selectedDatasetId || "all datasets";
+  const modeLabel = selectedMode === "semantic" ? "Semantic" : "Keyword";
 
   if (data.results.length === 0) {
     resultsDiv.innerHTML = `
-      <h2>Results for "${escapeHtml(data.query)}" in ${escapeHtml(datasetLabel)}</h2>
+      <h2>${escapeHtml(modeLabel)} results for "${escapeHtml(data.query)}" in ${escapeHtml(datasetLabel)}</h2>
       <p>No results found.</p>
     `;
     return;
   }
 
   resultsDiv.innerHTML = `
-    <h2>Results for "${escapeHtml(data.query)}" in ${escapeHtml(datasetLabel)}</h2>
+    <h2>${escapeHtml(modeLabel)} results for "${escapeHtml(data.query)}" in ${escapeHtml(datasetLabel)}</h2>
 
     ${data.results.map(result => {
       const datasetId = encodeURIComponent(result.dataset_id);
@@ -183,9 +202,22 @@ async function runSearch(query, options = {}) {
       const metadataUrl = `/v1/datasets/${datasetId}/series/by-indicator/${indicatorCode}`;
       const csvUrl = `${metadataUrl}/observations.csv?limit=10000`;
 
+      let scoreHtml = "";
+
+      if (result.similarity_score !== undefined && result.similarity_score !== null) {
+        const similarity = Number(result.similarity_score);
+        scoreHtml = `
+          <p class="result-score">
+            Semantic similarity: ${similarity.toFixed(3)}
+          </p>
+        `;
+      }
+
       return `
         <div class="result">
           <h3>${escapeHtml(result.indicator_name || result.indicator_code)}</h3>
+
+          ${scoreHtml}
 
           <p>
             Indicator:
@@ -228,9 +260,9 @@ async function runSearch(query, options = {}) {
               View first 5 observations JSON
             </a>
             |
-	    <a href="${csvUrl}">
-	      Download CSV
-	    </a>
+            <a href="${csvUrl}">
+              Download CSV
+            </a>
             ${externalLink(result.source_url, "Official SDMX source")}
             ${externalLink(result.documentation_url, "ONS documentation")}
             ${externalLink(result.metadata_url, "IMF metadata")}
@@ -241,6 +273,7 @@ async function runSearch(query, options = {}) {
   `;
 }
 
+
 form.addEventListener("submit", event => {
   event.preventDefault();
   runSearch(input.value);
@@ -249,6 +282,12 @@ form.addEventListener("submit", event => {
 datasetSelect.addEventListener("change", () => {
   runSearch(input.value);
 });
+
+if (searchModeSelect) {
+  searchModeSelect.addEventListener("change", () => {
+    runSearch(input.value);
+  });
+}
 
 loadDatasetSummary().then(() => {
   runSearch(input.value, { updateUrl: false });

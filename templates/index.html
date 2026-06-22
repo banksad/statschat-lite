@@ -23,6 +23,13 @@
 
   <form id="search-form">
     <p>
+    <label for="search-mode">Search mode</label><br>
+      <select id="search-mode" name="mode">
+        <option value="keyword">Keyword</option>
+        <option value="semantic">Semantic</option>
+      </select>
+    </p>
+    <p>
       <label for="dataset-select">Dataset</label><br>
       <select id="dataset-select">
         <option value="">All datasets</option>
@@ -42,13 +49,13 @@
   </form>
 
   <p class="muted">
-    This page calls the local FastAPI endpoint:
+    This page calls the local FastAPI search endpoints. Semantic mode uses Google Gemini query embeddings and pgvector similarity search.
     <span class="code">/v1/series/search</span>
   </p>
 
   <div id="results"></div>
 
-  <script src="/static/app.js?v=4"></script>
+  <script src="/static/app.js?v=5"></script>
 
 </body>
 </html>
