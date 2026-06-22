@@ -124,3 +124,38 @@ button {
 .metadata-list dd {
   margin: 0;
 }
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border-top: 1px solid #ddd;
+  padding: 0.55rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  font-weight: 700;
+}
+
+.series-table {
+  min-width: 760px;
+}
+
+.series-table td:first-child {
+  max-width: 30rem;
+}
+
+.numeric {
+  text-align: right;
+}

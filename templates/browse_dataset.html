@@ -92,15 +92,15 @@
         {% endif %}
       </p>
 
-      <p>
-        <a href="/search">
-          Search within this dataset
-        </a>
-        |
-        <a href="/v1/datasets" target="_blank" rel="noopener noreferrer">
-          View datasets JSON
-        </a>
-      </p>
+	<p>
+	  <a href="/search?dataset_id={{ dataset.dataset_id }}">
+	    Search within this dataset
+	  </a>
+	  |
+	  <a href="/v1/datasets" target="_blank" rel="noopener noreferrer">
+	    View datasets JSON
+	  </a>
+	</p>
     </section>
 
     <section class="card">
@@ -111,7 +111,8 @@
           Showing {{ series_count }} series.
         </p>
 
-        <table>
+        <div class="table-scroll">
+	  <table class="series-table">
           <thead>
             <tr>
               <th>Series</th>
@@ -154,13 +155,14 @@
                 {% endif %}
               </td>
 
-              <td>
+              <td class="numeric">
                 {{ item.observation_count }}
               </td>
             </tr>
             {% endfor %}
           </tbody>
-        </table>
+          </table>
+	</div>
       {% else %}
         <p>No series are currently loaded for this dataset.</p>
       {% endif %}
