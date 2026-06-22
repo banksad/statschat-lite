@@ -159,3 +159,102 @@ th {
 .numeric {
   text-align: right;
 }
+
+.site-header {
+  margin-bottom: 1.5rem;
+}
+
+.site-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid #d0d7de;
+  margin-bottom: 1.25rem;
+}
+
+.site-tab {
+  display: inline-block;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 0.5rem 0.5rem 0 0;
+  color: #333;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.site-tab:hover {
+  background: #f6f8fa;
+}
+
+.site-tab-active {
+  background: #ffffff;
+  border-color: #d0d7de;
+  color: #000;
+  margin-bottom: -1px;
+}
+
+.dataset-panel {
+  border: 1px solid #d0d7de;
+  border-radius: 0.6rem;
+  padding: 1rem;
+  margin: 1rem 0 1.25rem;
+  background: #fafafa;
+}
+
+.dataset-panel-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.dataset-panel-header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.dataset-panel-header p {
+  margin: 0;
+}
+
+.dataset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.75rem;
+}
+
+.dataset-card-compact {
+  border: 1px solid #d8dee4;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  background: #ffffff;
+}
+
+.dataset-card-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  line-height: 1.3;
+}
+
+.dataset-card-title span {
+  font-size: 0.9rem;
+}
+
+.dataset-card-meta {
+  margin: 0.45rem 0;
+  color: #57606a;
+  font-size: 0.85rem;
+}
+
+.dataset-card-links {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.result-score {
+  color: #57606a;
+  font-size: 0.9rem;
+  font-weight: 600;
+}

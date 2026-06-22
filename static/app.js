@@ -111,36 +111,55 @@ async function loadDatasetSummary() {
     return;
   }
 
-  datasetSummaryDiv.innerHTML = `
-    <h2>Available datasets</h2>
-    ${data.datasets.map(dataset => `
-      <p>
-        <strong>${escapeHtml(dataset.dataset_id)}</strong>
-        ${dataset.dataset_title ? `— ${escapeHtml(dataset.dataset_title)}` : ""}
-      </p>
+	datasetSummaryDiv.innerHTML = `
+	  <section class="dataset-panel">
+	    <div class="dataset-panel-header">
+	      <h2>Available datasets</h2>
+	      <p class="muted">
+		${escapeHtml(data.datasets.length)} datasets loaded from source-backed SDMX metadata.
+	      </p>
+	    </div>
 
-      <p>
-        Series: ${escapeHtml(dataset.series_count)}
-        |
-        Observations: ${escapeHtml(dataset.observation_count)}
-        |
-        Structure:
-        <span class="code">${escapeHtml(dataset.structure_ref)}</span>
-      </p>
+	    <div class="dataset-grid">
+	      ${data.datasets.map(dataset => `
+		<article class="dataset-card-compact">
+		  <div class="dataset-card-title">
+		    <strong>${escapeHtml(dataset.dataset_id)}</strong>
+		    ${dataset.dataset_title ? `<span>${escapeHtml(dataset.dataset_title)}</span>` : ""}
+		  </div>
 
-      <p>
-        <a href="/browse/datasets/${encodeURIComponent(dataset.dataset_id)}">
-          Browse dataset
-        </a>
-        |
-        <a href="${escapeHtml(dataset.source_url)}" target="_blank" rel="noopener noreferrer">
-          Official SDMX source
-        </a>
-        ${externalLink(dataset.documentation_url, "ONS documentation")}
-        ${externalLink(dataset.metadata_url, "IMF metadata")}
-      </p>
-    `).join("")}
-  `;
+		  <p class="dataset-card-meta">
+		    ${escapeHtml(dataset.series_count)} series
+		    ·
+		    ${escapeHtml(dataset.observation_count)} observations
+		  </p>
+
+		  <p class="dataset-card-links">
+		    <a href="/browse/datasets/${encodeURIComponent(dataset.dataset_id)}">
+		      Browse
+		    </a>
+		    |
+		    <a href="${escapeHtml(dataset.source_url)}" target="_blank" rel="noopener noreferrer">
+		      Source
+		    </a>
+		    ${dataset.documentation_url ? `
+		      |
+		      <a href="${escapeHtml(dataset.documentation_url)}" target="_blank" rel="noopener noreferrer">
+			Docs
+		      </a>
+		    ` : ""}
+		    ${dataset.metadata_url ? `
+		      |
+		      <a href="${escapeHtml(dataset.metadata_url)}" target="_blank" rel="noopener noreferrer">
+			Metadata
+		      </a>
+		    ` : ""}
+		  </p>
+		</article>
+	      `).join("")}
+	    </div>
+	  </section>
+	`;
 }
 
 
