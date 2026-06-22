@@ -15,9 +15,15 @@ services:
     build:
       context: ../..
       dockerfile: Dockerfile
+    image: local-api
     container_name: ons-sdmx-api
     environment:
       ONS_SDMX_DB_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT}
+      GOOGLE_CLOUD_LOCATION: ${GOOGLE_CLOUD_LOCATION:-global}
+      GOOGLE_GENAI_USE_ENTERPRISE: ${GOOGLE_GENAI_USE_ENTERPRISE:-True}
+    volumes:
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
     ports:
       - "8000:8000"
     depends_on:

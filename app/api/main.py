@@ -25,6 +25,12 @@ from scripts.query_postgres import (
     search_series,
 )
 
+from scripts.semantic_search_backend import (
+    DEFAULT_SEMANTIC_DIMENSION,
+    DEFAULT_SEMANTIC_MODEL,
+    semantic_search_series,
+)
+
 
 BASE_DIR = FilePath(__file__).resolve().parents[2]
 TEMPLATES_DIR = BASE_DIR / "templates"
@@ -568,6 +574,65 @@ def search_series_endpoint(
         rows,
         dataset_id=dataset_id,
     )
+
+
+@app.get("/v1/series/search/semantic")
+def semantic_search_series_endpoint(
+    q: str = Query(
+        ...,
+        min_length=2,
+        description="Natural-language search query.",
+    ),
+    dataset_id: str | None = Query(
+        None,
+        description="Optional dataset filter, for example NAG_GBR.",
+    ),
+    limit: int = Query(
+        10,
+        ge=1,
+        le=50,
+        description="Maximum number of semantic search results to return.",
+    ),
+    min_similarity: float = Query(
+        0.0,
+        ge=0.0,
+        le=1.0,
+        description="Minimum similarity score. Similarity is approximately 1 - cosine distance.",
+    ),
+) -> dict[str, Any]:
+    """
+    Semantic search over source-backed series metadata.
+
+    The query is embedded with Gemini Embedding 2, then compared with stored
+    series metadata embeddings in Postgres using pgvector. The returned
+    series metadata and observations are still database-backed.
+    """
+    try:
+        rows = semantic_search_series(
+            query=q,
+            model=DEFAULT_SEMANTIC_MODEL,
+            embedding_dim=DEFAULT_SEMANTIC_DIMENSION,
+            limit=limit,
+            dataset_id=dataset_id,
+            min_similarity=min_similarity,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Semantic search is not available: {exc}",
+        ) from exc
+
+    return {
+        "query": q,
+        "search_type": "semantic",
+        "model": DEFAULT_SEMANTIC_MODEL,
+        "embedding_dim": DEFAULT_SEMANTIC_DIMENSION,
+        "dataset_id": dataset_id,
+        "limit": limit,
+        "min_similarity": min_similarity,
+        "count": len(rows),
+        "results": rows,
+    }
 
 
 @app.get("/v1/datasets/{dataset_id}/series/by-indicator/{indicator_code}")
