@@ -389,6 +389,76 @@ def list_datasets_endpoint() -> dict[str, Any]:
         "datasets": rows,
     }
 
+@app.get("/v1/datasets/{dataset_id}")
+def get_dataset_endpoint(
+    dataset_id: str = Path(
+        ...,
+        description="Dataset ID, for example NAG_GBR.",
+    ),
+) -> dict[str, Any]:
+    """
+    Return one dataset by public dataset_id.
+
+    This is the machine-readable counterpart to /browse/datasets/{dataset_id}.
+    """
+    row = get_dataset(dataset_id)
+
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Dataset not found for dataset_id={dataset_id}.",
+        )
+
+    return row
+
+
+@app.get("/v1/datasets/{dataset_id}/series")
+def list_dataset_series_endpoint(
+    dataset_id: str = Path(
+        ...,
+        description="Dataset ID, for example NAG_GBR.",
+    ),
+    limit: int = Query(
+        100,
+        ge=1,
+        le=500,
+        description="Maximum number of series to return.",
+    ),
+    offset: int = Query(
+        0,
+        ge=0,
+        description="Number of series to skip.",
+    ),
+) -> dict[str, Any]:
+    """
+    Return series belonging to one dataset.
+
+    This is the machine-readable counterpart to the dataset Browse page's
+    series table.
+    """
+    dataset = get_dataset(dataset_id)
+
+    if dataset is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Dataset not found for dataset_id={dataset_id}.",
+        )
+
+    rows = list_series_for_dataset(
+        dataset_id,
+        limit=limit,
+        offset=offset,
+    )
+
+    return {
+        "dataset_id": dataset_id,
+        "limit": limit,
+        "offset": offset,
+        "count": len(rows),
+        "total_series_count": dataset["series_count"],
+        "series": rows,
+    }
+
 
 @app.get("/v1/series/search")
 def search_series_endpoint(

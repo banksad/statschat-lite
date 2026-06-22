@@ -97,8 +97,12 @@
 	    Search within this dataset
 	  </a>
 	  |
-	  <a href="/v1/datasets" target="_blank" rel="noopener noreferrer">
-	    View datasets JSON
+	  <a href="/v1/datasets/{{ dataset.dataset_id }}" target="_blank" rel="noopener noreferrer">
+	    View dataset JSON
+	  </a>
+	  |
+	  <a href="/v1/datasets/{{ dataset.dataset_id }}/series?limit=100" target="_blank" rel="noopener noreferrer">
+	    View series JSON
 	  </a>
 	</p>
     </section>

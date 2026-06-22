@@ -161,12 +161,17 @@ def get_dataset(dataset_id: str) -> dict[str, Any] | None:
 def list_series_for_dataset(
     dataset_id: str,
     limit: int = 500,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     """
     Return series belonging to one dataset.
 
     The series table stores SDMX-derived metadata in JSONB fields. We extract
-    the most useful public-facing fields here so the template can stay simple.
+    useful public-facing fields here so HTML templates and API endpoints can
+    share the same source-backed representation.
+
+    limit and offset make this safe to expose through the public API without
+    returning every series by default.
     """
     sql = """
         SELECT
@@ -212,12 +217,13 @@ def list_series_for_dataset(
                     s.series_key
                 )
             )
-        LIMIT %s;
+        LIMIT %s
+        OFFSET %s;
     """
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (dataset_id, limit))
+            cur.execute(sql, (dataset_id, limit, offset))
             return list(cur.fetchall())
 
 

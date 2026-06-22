@@ -21,13 +21,106 @@
     </section>
 
     <section class="card">
-      <h2>Useful endpoints</h2>
+      <h2>Health</h2>
 
       <ul>
         <li><a href="/health">/health</a></li>
         <li><a href="/health/db">/health/db</a></li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Datasets</h2>
+
+      <ul>
         <li><a href="/v1/datasets">/v1/datasets</a></li>
-        <li><a href="/v1/series/search?q=inflation">/v1/series/search?q=inflation</a></li>
+        <li><a href="/v1/datasets/NAG_GBR">/v1/datasets/NAG_GBR</a></li>
+        <li><a href="/v1/datasets/CPI_GBR">/v1/datasets/CPI_GBR</a></li>
+        <li><a href="/v1/datasets/BOP_GBR">/v1/datasets/BOP_GBR</a></li>
+        <li><a href="/v1/datasets/SBS_GBR">/v1/datasets/SBS_GBR</a></li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Dataset series</h2>
+
+      <ul>
+        <li>
+          <a href="/v1/datasets/NAG_GBR/series?limit=10">
+            /v1/datasets/NAG_GBR/series?limit=10
+          </a>
+        </li>
+        <li>
+          <a href="/v1/datasets/CPI_GBR/series?limit=10">
+            /v1/datasets/CPI_GBR/series?limit=10
+          </a>
+        </li>
+        <li>
+          <a href="/v1/datasets/BOP_GBR/series?limit=10">
+            /v1/datasets/BOP_GBR/series?limit=10
+          </a>
+        </li>
+        <li>
+          <a href="/v1/datasets/SBS_GBR/series?limit=10">
+            /v1/datasets/SBS_GBR/series?limit=10
+          </a>
+        </li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Search</h2>
+
+      <ul>
+        <li>
+          <a href="/v1/series/search?q=inflation">
+            /v1/series/search?q=inflation
+          </a>
+        </li>
+        <li>
+          <a href="/v1/series/search?q=exports&amp;dataset_id=NAG_GBR">
+            /v1/series/search?q=exports&amp;dataset_id=NAG_GBR
+          </a>
+        </li>
+        <li>
+          <a href="/v1/series/search?q=price&amp;dataset_id=CPI_GBR">
+            /v1/series/search?q=price&amp;dataset_id=CPI_GBR
+          </a>
+        </li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Series metadata and observations</h2>
+
+      <ul>
+        <li>
+          <a href="/v1/datasets/NAG_GBR/series/by-indicator/NGDP_R_SA_XDC">
+            /v1/datasets/NAG_GBR/series/by-indicator/NGDP_R_SA_XDC
+          </a>
+        </li>
+        <li>
+          <a href="/v1/datasets/NAG_GBR/series/by-indicator/NGDP_R_SA_XDC/observations?limit=20">
+            /v1/datasets/NAG_GBR/series/by-indicator/NGDP_R_SA_XDC/observations?limit=20
+          </a>
+        </li>
+        <li>
+          <a href="/v1/datasets/CPI_GBR/series/by-indicator/PCPI_IX">
+            /v1/datasets/CPI_GBR/series/by-indicator/PCPI_IX
+          </a>
+        </li>
+        <li>
+          <a href="/v1/datasets/CPI_GBR/series/by-indicator/PCPI_IX/observations?limit=20">
+            /v1/datasets/CPI_GBR/series/by-indicator/PCPI_IX/observations?limit=20
+          </a>
+        </li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>API documentation</h2>
+
+      <ul>
         <li><a href="/docs">Interactive API docs</a></li>
         <li><a href="/openapi.json">OpenAPI JSON</a></li>
       </ul>
