@@ -337,3 +337,24 @@ th {
   color: #57606a;
   font-size: 0.85rem;
 }
+
+.result h3 {
+  margin-bottom: 0.3rem;
+}
+
+.result h3 a {
+  text-decoration: none;
+}
+
+.result h3 a:hover {
+  text-decoration: underline;
+}
+
+.result-dataset-link {
+  margin-top: 0;
+  color: #57606a;
+}
+
+.result-dataset-link .code {
+  margin-left: 0.35rem;
+}

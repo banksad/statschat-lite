@@ -232,22 +232,41 @@ async function runSearch(query, options = {}) {
         `;
       }
 
-      return `
-        <div class="result">
-          <h3>${escapeHtml(result.indicator_name || result.indicator_code)}</h3>
+	const displayName = (
+	  result.display_name
+	  || result.primary_text
+	  || result.indicator_name
+	  || result.indicator_code
+	);
 
-          ${scoreHtml}
+	return `
+	  <div class="result">
+	    <h3>
+	      <a href="/series/${datasetId}/${indicatorCode}">
+		${escapeHtml(displayName)}
+	      </a>
+	    </h3>
 
-          <p>
-            Indicator:
-            <span class="code">${escapeHtml(result.indicator_code)}</span>
-          </p>
+	    <p class="result-dataset-link">
+	      Dataset:
+	      <a href="/browse/datasets/${datasetId}">
+		${escapeHtml(result.dataset_title || result.dataset_id)}
+	      </a>
+	      <span class="code">${escapeHtml(result.dataset_id)}</span>
+	    </p>
 
-          <p>
-            Dataset:
-            <span class="code">${escapeHtml(result.dataset_id)}</span>
-            ${result.dataset_title ? `— ${escapeHtml(result.dataset_title)}` : ""}
-          </p>
+	    ${scoreHtml}
+
+	    ${result.indicator_name ? `
+	      <p class="series-official-name">
+		Official label: ${escapeHtml(result.indicator_name)}
+	      </p>
+	    ` : ""}
+
+	    <p>
+	      Indicator code:
+	      <span class="code">${escapeHtml(result.indicator_code)}</span>
+	    </p>
 
           <p>
             Structure:
@@ -263,17 +282,9 @@ async function runSearch(query, options = {}) {
           </p>
 
           <p>
-            <a href="/series/${datasetId}/${indicatorCode}">
-              View series page
-            </a>
-            |
-            <a href="/browse/datasets/${datasetId}">
-              Browse dataset
-            </a>
-            |
-            <a href="/v1/datasets/${datasetId}/series/by-indicator/${indicatorCode}" target="_blank" rel="noopener noreferrer">
-              View metadata JSON
-            </a>
+	    <a href="/v1/datasets/${datasetId}/series/by-indicator/${indicatorCode}" target="_blank" rel="noopener noreferrer">
+	      View metadata JSON
+	    </a>
             |
             <a href="/v1/datasets/${datasetId}/series/by-indicator/${indicatorCode}/observations?limit=5" target="_blank" rel="noopener noreferrer">
               View first 5 observations JSON
