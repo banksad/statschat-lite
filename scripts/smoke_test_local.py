@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import time
 import csv
 import io
 import json
@@ -19,30 +20,46 @@ class HttpResult:
     body: str
 
 
-def fetch(base_url: str, path: str, timeout: float = 5.0) -> HttpResult:
+def fetch(
+    base_url: str,
+    path: str,
+    timeout: float = 5.0,
+    attempts: int = 5,
+    delay_seconds: float = 1.0,
+) -> HttpResult:
     """
-    Fetch a URL from the local StatsFinder app.
+    Fetch a URL from the StatsFinder app.
 
-    Uses only the Python standard library so this smoke test has no extra
-    dependency beyond Python itself.
+    Retries connection-level failures because Docker/Cloud Run services can
+    take a few seconds to become ready after startup.
     """
     url = base_url.rstrip("/") + path
+    last_error: Exception | None = None
 
-    try:
-        with urllib.request.urlopen(url, timeout=timeout) as response:
-            body = response.read().decode("utf-8")
+    for attempt in range(1, attempts + 1):
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as response:
+                body = response.read().decode("utf-8")
+                return HttpResult(
+                    status=response.status,
+                    content_type=response.headers.get("content-type", ""),
+                    body=body,
+                )
+        except urllib.error.HTTPError as error:
+            body = error.read().decode("utf-8")
             return HttpResult(
-                status=response.status,
-                content_type=response.headers.get("content-type", ""),
+                status=error.code,
+                content_type=error.headers.get("content-type", ""),
                 body=body,
             )
-    except urllib.error.HTTPError as error:
-        body = error.read().decode("utf-8")
-        return HttpResult(
-            status=error.code,
-            content_type=error.headers.get("content-type", ""),
-            body=body,
-        )
+        except (urllib.error.URLError, ConnectionResetError) as error:
+            last_error = error
+
+            if attempt < attempts:
+                time.sleep(delay_seconds)
+                continue
+
+    raise AssertionError(f"Could not connect to {url}: {last_error}")
 
 
 def require(condition: bool, message: str) -> None:

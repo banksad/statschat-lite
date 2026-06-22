@@ -1,9 +1,14 @@
 .venv/
+venv/
 __pycache__/
 *.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 .git/
-.gitignore
+.github/
 
 data/raw/
 data/processed/
@@ -17,5 +22,7 @@ pretty/
 
 .env
 .env.*
+!.env.example
 
 .DS_Store
+*.log
