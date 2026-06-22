@@ -30,6 +30,94 @@ CONTROLLED_ABBREVIATIONS = {
     "balance of payments": "BOP",
 }
 
+GGO_LABEL_DROP_PARTS = {
+    "government and public sector finance",
+    "fiscal",
+    "2014 manual",
+    "national currency",
+}
+
+
+def split_ggo_indicator_label(indicator_name: str) -> list[str]:
+    """
+    Split a GGO official SDMX indicator label into hierarchy parts.
+
+    Some labels use:
+      "Revenue  General Government [2014 Manual]"
+
+    rather than:
+      "Revenue, General Government, 2014 Manual"
+
+    so we normalise bracketed methodology and the missing comma around
+    General Government.
+    """
+    label = clean_whitespace(indicator_name)
+
+    # Convert bracketed methodology into a comma-separated part.
+    label = re.sub(r"\s*\[([^\]]+)\]", r", \1", label)
+
+    raw_parts = [
+        clean_whitespace(part)
+        for part in label.split(",")
+        if clean_whitespace(part)
+    ]
+
+    parts: list[str] = []
+
+    for part in raw_parts:
+        if part != "General Government" and "General Government" in part:
+            before = clean_whitespace(part.replace("General Government", ""))
+
+            if before:
+                parts.append(before)
+
+            parts.append("General Government")
+        else:
+            parts.append(part)
+
+    return dedupe_preserve_order(parts)
+
+
+def build_ggo_primary_text(indicator_name: str) -> str | None:
+    """
+    Build a source-backed, human-friendly GGO series name from the official
+    SDMX indicator label.
+
+    This deliberately avoids parsing the compact indicator code. It keeps the
+    useful hierarchy and removes only dataset-wide prefixes and trailing
+    qualifiers.
+    """
+    parts = split_ggo_indicator_label(indicator_name)
+
+    cleaned_parts = [
+        part
+        for part in parts
+        if clean_whitespace(part).lower() not in GGO_LABEL_DROP_PARTS
+    ]
+
+    has_general_government = any(
+        clean_whitespace(part).lower() == "general government"
+        for part in cleaned_parts
+    )
+
+    ordered_parts: list[str] = []
+
+    if has_general_government:
+        ordered_parts.append("General Government")
+
+    for part in cleaned_parts:
+        if clean_whitespace(part).lower() == "general government":
+            continue
+
+        ordered_parts.append(part)
+
+    ordered_parts = dedupe_preserve_order(ordered_parts)
+
+    if not ordered_parts:
+        return None
+
+    return ", ".join(ordered_parts)
+
 
 def clean_whitespace(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
@@ -250,7 +338,9 @@ def build_content_hash(
 
 
 def build_search_document(row: dict[str, Any]) -> dict[str, Any]:
+    dataset_id = row.get("dataset_id", "")
     indicator_name = row.get("indicator_name")
+
     parts = split_indicator_name(indicator_name)
     classified = classify_parts(parts)
 
@@ -265,6 +355,54 @@ def build_search_document(row: dict[str, Any]) -> dict[str, Any]:
     unit_multiplier = safe_dimension_value(row, "UNIT_MULT")
 
     primary_text = topic or indicator_name or row.get("indicator_code") or row["series_key"]
+
+    parsed_metadata = {
+        "parsed_topic": topic,
+        "hierarchy": hierarchy,
+        "measure_type": measure_type,
+        "seasonal_adjustment": seasonal_adjustment,
+        "unit": unit,
+        "base_period": base_period,
+        "unit_multiplier": unit_multiplier,
+    }
+
+    if dataset_id == "GGO_GBR" and indicator_name:
+        ggo_parts = split_ggo_indicator_label(indicator_name)
+        ggo_primary_text = build_ggo_primary_text(indicator_name)
+
+        if ggo_primary_text:
+            primary_text = ggo_primary_text
+
+            ggo_hierarchy_raw = [
+                part
+                for part in ggo_parts
+                if clean_whitespace(part).lower() not in GGO_LABEL_DROP_PARTS
+            ]
+
+            has_general_government = any(
+                clean_whitespace(part).lower() == "general government"
+                for part in ggo_hierarchy_raw
+            )
+
+            ggo_hierarchy: list[str] = []
+
+            if has_general_government:
+                ggo_hierarchy.append("General Government")
+
+            for part in ggo_hierarchy_raw:
+                if clean_whitespace(part).lower() == "general government":
+                    continue
+
+                ggo_hierarchy.append(part)
+
+            ggo_hierarchy = dedupe_preserve_order(ggo_hierarchy)
+
+            topic = ggo_primary_text
+            hierarchy = ggo_hierarchy
+
+            parsed_metadata["parsed_topic"] = ggo_primary_text
+            parsed_metadata["hierarchy"] = ggo_hierarchy
+            parsed_metadata["ggo_label_parts"] = ggo_parts
 
     embedding_text = build_embedding_text(
         row=row,
@@ -285,16 +423,6 @@ def build_search_document(row: dict[str, Any]) -> dict[str, Any]:
         seasonal_adjustment=seasonal_adjustment,
         unit=unit,
     )
-
-    parsed_metadata = {
-        "parsed_topic": topic,
-        "hierarchy": hierarchy,
-        "measure_type": measure_type,
-        "seasonal_adjustment": seasonal_adjustment,
-        "unit": unit,
-        "base_period": base_period,
-        "unit_multiplier": unit_multiplier,
-    }
 
     content_hash = build_content_hash(
         document_version=DOCUMENT_VERSION,
