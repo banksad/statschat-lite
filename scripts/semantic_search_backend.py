@@ -76,6 +76,7 @@ def search_series_by_embedding(
     limit: int = 10,
     dataset_id: str | None = None,
     min_similarity: float = 0.0,
+    include_debug: bool = False,
 ) -> list[dict[str, Any]]:
     """
     Search stored series embeddings using cosine distance.
@@ -181,7 +182,16 @@ def search_series_by_embedding(
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, params)
-            return list(cur.fetchall())
+            rows = list(cur.fetchall())
+
+    if include_debug:
+        return rows
+
+    for row in rows:
+        row.pop("embedding_text", None)
+        row.pop("keyword_text", None)
+
+    return rows
 
 
 def semantic_search_series(
@@ -191,6 +201,7 @@ def semantic_search_series(
     limit: int = 10,
     dataset_id: str | None = None,
     min_similarity: float = 0.0,
+    include_debug: bool = False,
 ) -> list[dict[str, Any]]:
     query_embedding = embed_query(
         query=query,
@@ -205,4 +216,5 @@ def semantic_search_series(
         limit=limit,
         dataset_id=dataset_id,
         min_similarity=min_similarity,
+        include_debug=include_debug,
     )

@@ -597,7 +597,17 @@ def semantic_search_series_endpoint(
         0.0,
         ge=0.0,
         le=1.0,
-        description="Minimum similarity score. Similarity is approximately 1 - cosine distance.",
+        description=(
+            "Minimum similarity score. Similarity is approximately "
+            "1 - cosine distance."
+        ),
+    ),
+    include_debug: bool = Query(
+        False,
+        description=(
+            "Include retrieval debug fields such as embedding_text "
+            "and keyword_text."
+        ),
     ),
 ) -> dict[str, Any]:
     """
@@ -615,6 +625,7 @@ def semantic_search_series_endpoint(
             limit=limit,
             dataset_id=dataset_id,
             min_similarity=min_similarity,
+            include_debug=include_debug,
         )
     except RuntimeError as exc:
         raise HTTPException(
@@ -630,6 +641,7 @@ def semantic_search_series_endpoint(
         "dataset_id": dataset_id,
         "limit": limit,
         "min_similarity": min_similarity,
+        "include_debug": include_debug,
         "count": len(rows),
         "results": rows,
     }
