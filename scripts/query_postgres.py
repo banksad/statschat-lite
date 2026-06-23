@@ -102,6 +102,8 @@ def list_datasets() -> list[dict[str, Any]]:
         GROUP BY
             d.dataset_id,
             d.title,
+            d.data_domain_code,
+            d.data_domain_label,
             d.source_url,
             d.documentation_url,
             d.metadata_url,
@@ -113,14 +115,14 @@ def list_datasets() -> list[dict[str, Any]]:
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql)
-            return cur.fetchall()
+            return list(cur.fetchall())
 
 
 def get_dataset(dataset_id: str) -> dict[str, Any] | None:
     """
     Return one dataset by public dataset_id.
 
-    Browse v1 uses curated navigation, but this page content is source-backed:
+    Browse uses curated navigation, but this page content is source-backed:
     dataset metadata and counts come from the database.
     """
     sql = """
@@ -261,9 +263,11 @@ def list_series_for_dataset(
         WHERE s.dataset_id = %s
         ORDER BY
             display_name,
+            frequency_code,
             measure_type NULLS LAST,
             seasonal_adjustment NULLS LAST,
-            indicator_code
+            indicator_code,
+            s.series_id
         LIMIT %s
         OFFSET %s;
     """
@@ -280,12 +284,10 @@ def search_series(
     dataset_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """
-    Search for series using search_text.
+    Search for series using source-backed metadata.
 
-    This is currently literal metadata search: user terms must match the
-    official parsed metadata text.
-
-    If dataset_id is provided, restrict search to that dataset.
+    This is currently literal metadata search. It searches the cleaned semantic
+    keyword_text when available, falling back to the original series search_text.
     """
     terms = split_query_terms(query)
 
@@ -296,7 +298,7 @@ def search_series(
     params: list[Any] = []
 
     for term in terms:
-        where_clauses.append("s.search_text ILIKE %s")
+        where_clauses.append("COALESCE(sd.keyword_text, s.search_text) ILIKE %s")
         params.append(f"%{term}%")
 
     if dataset_id:
@@ -306,6 +308,15 @@ def search_series(
     where_sql = " AND ".join(where_clauses)
 
     sql = f"""
+        WITH observation_summary AS (
+            SELECT
+                series_id,
+                MIN(time_period) AS first_period,
+                MAX(time_period) AS latest_period,
+                COUNT(observation_id) AS observation_count
+            FROM observations
+            GROUP BY series_id
+        )
         SELECT
             s.series_id,
             s.dataset_id,
@@ -314,33 +325,36 @@ def search_series(
             d.documentation_url,
             d.metadata_url,
             d.structure_ref,
+            s.series_key,
             s.dimension_values ->> 'INDICATOR' AS indicator_code,
             s.dimension_labels -> 'INDICATOR' ->> 'name' AS indicator_name,
+            COALESCE(
+                sd.primary_text,
+                s.dimension_labels -> 'INDICATOR' ->> 'name',
+                s.dimension_values ->> 'INDICATOR'
+            ) AS display_name,
+            sd.parsed_metadata ->> 'measure_type' AS measure_type,
+            sd.parsed_metadata ->> 'seasonal_adjustment' AS seasonal_adjustment,
+            sd.parsed_metadata ->> 'unit' AS unit,
+            sd.parsed_metadata ->> 'base_period' AS base_period,
+            sd.parsed_metadata ->> 'unit_multiplier' AS unit_multiplier,
             s.dimension_values ->> 'FREQ' AS frequency_code,
             s.dimension_labels -> 'FREQ' ->> 'name' AS frequency_name,
-            MIN(o.time_period) AS first_period,
-            MAX(o.time_period) AS latest_period,
-            COUNT(o.observation_id) AS observation_count
+            observation_summary.first_period,
+            observation_summary.latest_period,
+            COALESCE(observation_summary.observation_count, 0) AS observation_count
         FROM series s
         JOIN datasets d
             ON d.dataset_id = s.dataset_id
-        LEFT JOIN observations o
-            ON o.series_id = s.series_id
+        LEFT JOIN series_search_documents sd
+            ON sd.series_id = s.series_id
+        LEFT JOIN observation_summary
+            ON observation_summary.series_id = s.series_id
         WHERE {where_sql}
-        GROUP BY
-            s.series_id,
-            s.dataset_id,
-            d.title,
-            d.source_url,
-            d.documentation_url,
-            d.metadata_url,
-            d.structure_ref,
-            s.dimension_values ->> 'INDICATOR',
-            s.dimension_labels -> 'INDICATOR' ->> 'name',
-            s.dimension_values ->> 'FREQ',
-            s.dimension_labels -> 'FREQ' ->> 'name'
         ORDER BY
             observation_count DESC,
+            display_name,
+            frequency_code,
             s.series_id
         LIMIT %s;
     """
@@ -350,56 +364,23 @@ def search_series(
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, params)
-            return cur.fetchall()
+            return list(cur.fetchall())
 
 
 def get_series_summary(series_id: int) -> dict[str, Any] | None:
     """
-    Return one summary row for a series.
-
-    This is the kind of information a future API result page might show.
+    Return one summary row for a series using its internal series_id.
     """
     sql = """
-        SELECT
-            s.series_id,
-            s.dataset_id,
-            s.dimension_values ->> 'INDICATOR' AS indicator_code,
-            s.dimension_labels -> 'INDICATOR' ->> 'name' AS indicator_name,
-            s.dimension_values ->> 'FREQ' AS frequency_code,
-            s.dimension_labels -> 'FREQ' ->> 'name' AS frequency_name,
-            MIN(o.time_period) AS first_period,
-            MAX(o.time_period) AS latest_period,
-            COUNT(o.observation_id) AS observation_count
-        FROM series s
-        LEFT JOIN observations o
-            ON o.series_id = s.series_id
-        WHERE s.series_id = %s
-        GROUP BY
-            s.series_id,
-            s.dataset_id,
-            s.dimension_values ->> 'INDICATOR',
-            s.dimension_labels -> 'INDICATOR' ->> 'name',
-            s.dimension_values ->> 'FREQ',
-            s.dimension_labels -> 'FREQ' ->> 'name';
-    """
-
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(sql, (series_id,))
-            return cur.fetchone()
-
-def get_series_summary_by_indicator(
-    dataset_id: str,
-    indicator_code: str,
-) -> dict[str, Any] | None:
-    """
-    Return one detailed summary row for a series identified by dataset_id
-    and indicator code.
-
-    This is more public-user-friendly than requiring the internal series_id,
-    while still exposing SDMX-derived metadata and source provenance.
-    """
-    sql = """
+        WITH observation_summary AS (
+            SELECT
+                series_id,
+                MIN(time_period) AS first_period,
+                MAX(time_period) AS latest_period,
+                COUNT(observation_id) AS observation_count
+            FROM observations
+            GROUP BY series_id
+        )
         SELECT
             s.series_id,
             s.dataset_id,
@@ -413,22 +394,77 @@ def get_series_summary_by_indicator(
             s.dimension_labels,
             s.dimension_values ->> 'INDICATOR' AS indicator_code,
             s.dimension_labels -> 'INDICATOR' ->> 'name' AS indicator_name,
+            COALESCE(
+                sd.primary_text,
+                s.dimension_labels -> 'INDICATOR' ->> 'name',
+                s.dimension_values ->> 'INDICATOR'
+            ) AS display_name,
+            sd.parsed_metadata ->> 'measure_type' AS measure_type,
+            sd.parsed_metadata ->> 'seasonal_adjustment' AS seasonal_adjustment,
+            sd.parsed_metadata ->> 'unit' AS unit,
+            sd.parsed_metadata ->> 'base_period' AS base_period,
+            sd.parsed_metadata ->> 'unit_multiplier' AS unit_multiplier,
             s.dimension_values ->> 'FREQ' AS frequency_code,
             s.dimension_labels -> 'FREQ' ->> 'name' AS frequency_name,
-            MIN(o.time_period) AS first_period,
-            MAX(o.time_period) AS latest_period,
-            COUNT(o.observation_id) AS observation_count
+            observation_summary.first_period,
+            observation_summary.latest_period,
+            COALESCE(observation_summary.observation_count, 0) AS observation_count
         FROM series s
         JOIN datasets d
             ON d.dataset_id = s.dataset_id
-        LEFT JOIN observations o
-            ON o.series_id = s.series_id
-        WHERE s.dataset_id = %s
-          AND s.dimension_values ->> 'INDICATOR' = %s
-        GROUP BY
+        LEFT JOIN series_search_documents sd
+            ON sd.series_id = s.series_id
+        LEFT JOIN observation_summary
+            ON observation_summary.series_id = s.series_id
+        WHERE s.series_id = %s;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (series_id,))
+            return cur.fetchone()
+
+
+def get_series_summary_by_indicator(
+    dataset_id: str,
+    indicator_code: str,
+    series_id: int | None = None,
+) -> dict[str, Any] | None:
+    """
+    Return one detailed summary row for a series identified by dataset_id
+    and indicator code.
+
+    When series_id is supplied, it disambiguates exact annual/quarterly
+    variants that share the same indicator code.
+    """
+    sql = """
+        WITH selected_series AS (
+            SELECT
+                s.series_id
+            FROM series s
+            WHERE s.dataset_id = %s
+              AND s.dimension_values ->> 'INDICATOR' = %s
+              AND (%s::integer IS NULL OR s.series_id = %s)
+            ORDER BY
+                s.series_id
+            LIMIT 1
+        ),
+        observation_summary AS (
+            SELECT
+                o.series_id,
+                MIN(o.time_period) AS first_period,
+                MAX(o.time_period) AS latest_period,
+                COUNT(o.observation_id) AS observation_count
+            FROM observations o
+            JOIN selected_series selected
+                ON selected.series_id = o.series_id
+            GROUP BY
+                o.series_id
+        )
+        SELECT
             s.series_id,
             s.dataset_id,
-            d.title,
+            d.title AS dataset_title,
             d.source_url,
             d.documentation_url,
             d.metadata_url,
@@ -436,23 +472,53 @@ def get_series_summary_by_indicator(
             s.series_key,
             s.dimension_values,
             s.dimension_labels,
-            s.dimension_values ->> 'INDICATOR',
-            s.dimension_labels -> 'INDICATOR' ->> 'name',
-            s.dimension_values ->> 'FREQ',
-            s.dimension_labels -> 'FREQ' ->> 'name';
+            s.dimension_values ->> 'INDICATOR' AS indicator_code,
+            s.dimension_labels -> 'INDICATOR' ->> 'name' AS indicator_name,
+            COALESCE(
+                sd.primary_text,
+                s.dimension_labels -> 'INDICATOR' ->> 'name',
+                s.dimension_values ->> 'INDICATOR'
+            ) AS display_name,
+            sd.parsed_metadata ->> 'measure_type' AS measure_type,
+            sd.parsed_metadata ->> 'seasonal_adjustment' AS seasonal_adjustment,
+            sd.parsed_metadata ->> 'unit' AS unit,
+            sd.parsed_metadata ->> 'base_period' AS base_period,
+            sd.parsed_metadata ->> 'unit_multiplier' AS unit_multiplier,
+            s.dimension_values ->> 'FREQ' AS frequency_code,
+            s.dimension_labels -> 'FREQ' ->> 'name' AS frequency_name,
+            observation_summary.first_period,
+            observation_summary.latest_period,
+            COALESCE(observation_summary.observation_count, 0) AS observation_count
+        FROM selected_series selected
+        JOIN series s
+            ON s.series_id = selected.series_id
+        JOIN datasets d
+            ON d.dataset_id = s.dataset_id
+        LEFT JOIN series_search_documents sd
+            ON sd.series_id = s.series_id
+        LEFT JOIN observation_summary
+            ON observation_summary.series_id = s.series_id;
     """
+
+    params = (
+        dataset_id,
+        indicator_code,
+        series_id,
+        series_id,
+    )
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (dataset_id, indicator_code))
+            cur.execute(sql, params)
             return cur.fetchone()
+
 
 def get_series_observations(
     series_id: int,
     limit: int = 10,
 ) -> list[dict[str, Any]]:
     """
-    Return observation rows for one series.
+    Return observation rows for one exact series.
     """
     sql = """
         SELECT
@@ -473,27 +539,50 @@ def get_series_observations(
 def get_series_observations_by_indicator(
     dataset_id: str,
     indicator_code: str,
+    series_id: int | None = None,
     limit: int = 10,
 ) -> list[dict[str, Any]]:
     """
-    Return observation rows for a series identified by dataset_id and indicator code.
+    Return observation rows for one series identified by dataset_id and
+    indicator code.
+
+    When series_id is supplied, it disambiguates exact annual/quarterly
+    variants that share the same indicator code.
     """
     sql = """
+        WITH selected_series AS (
+            SELECT
+                s.series_id
+            FROM series s
+            WHERE s.dataset_id = %s
+              AND s.dimension_values ->> 'INDICATOR' = %s
+              AND (%s::integer IS NULL OR s.series_id = %s)
+            ORDER BY
+                s.series_id
+            LIMIT 1
+        )
         SELECT
             o.time_period,
             o.obs_value
         FROM observations o
-        JOIN series s
-            ON o.series_id = s.series_id
-        WHERE s.dataset_id = %s
-          AND s.dimension_values ->> 'INDICATOR' = %s
-        ORDER BY o.time_period
+        JOIN selected_series selected
+            ON selected.series_id = o.series_id
+        ORDER BY
+            o.time_period
         LIMIT %s;
     """
 
+    params = (
+        dataset_id,
+        indicator_code,
+        series_id,
+        series_id,
+        limit,
+    )
+
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (dataset_id, indicator_code, limit))
+            cur.execute(sql, params)
             return list(cur.fetchall())
 
 
@@ -537,7 +626,9 @@ def build_observations_by_indicator_response(
     limit: int,
     rows: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Wrap observation rows for a public dataset/indicator identifier."""
+    """
+    Wrap observation rows for a public dataset/indicator identifier.
+    """
     return {
         "dataset_id": dataset_id,
         "indicator_code": indicator_code,
@@ -548,24 +639,35 @@ def build_observations_by_indicator_response(
 
 
 def print_search_results(rows: list[dict[str, Any]]) -> None:
-    """Print search results in a readable terminal format."""
+    """
+    Print search results in a readable terminal format.
+    """
     if not rows:
         print("No matching series found.")
         return
 
     for row in rows:
+        display_name = (
+            row.get("display_name")
+            or row.get("indicator_name")
+            or row.get("indicator_code")
+            or row.get("series_key")
+        )
+
         print(
             f"{row['series_id']:>3} | "
-            f"{row['indicator_code']} | "
-            f"{row['frequency_name']} | "
-            f"{row['first_period']} to {row['latest_period']} | "
-            f"{row['observation_count']} observations"
+            f"{row.get('indicator_code')} | "
+            f"{row.get('frequency_name') or row.get('frequency_code')} | "
+            f"{row.get('first_period')} to {row.get('latest_period')} | "
+            f"{row.get('observation_count')} observations"
         )
-        print(f"    {row['indicator_name']}")
+        print(f"    {display_name}")
 
 
 def print_summary(row: dict[str, Any] | None) -> None:
-    """Print one series summary."""
+    """
+    Print one series summary.
+    """
     if row is None:
         print("Series not found.")
         return
@@ -573,6 +675,7 @@ def print_summary(row: dict[str, Any] | None) -> None:
     print(f"series_id:         {row['series_id']}")
     print(f"dataset_id:        {row['dataset_id']}")
     print(f"indicator_code:    {row['indicator_code']}")
+    print(f"display_name:      {row.get('display_name')}")
     print(f"indicator_name:    {row['indicator_name']}")
     print(f"frequency_code:    {row['frequency_code']}")
     print(f"frequency_name:    {row['frequency_name']}")
@@ -582,7 +685,9 @@ def print_summary(row: dict[str, Any] | None) -> None:
 
 
 def print_observations(rows: list[dict[str, Any]]) -> None:
-    """Print observations in a readable terminal format."""
+    """
+    Print observations in a readable terminal format.
+    """
     if not rows:
         print("No observations found.")
         return
@@ -595,13 +700,13 @@ def build_parser() -> argparse.ArgumentParser:
     """
     Build the command-line interface.
 
-    This lets us run:
-        python3 scripts/query_postgres.py search "real gdp"
-        python3 scripts/query_postgres.py search "real gdp" --json
-        python3 scripts/query_postgres.py summary 11
-        python3 scripts/query_postgres.py summary 11 --json
-        python3 scripts/query_postgres.py observations 11 --limit 5
-        python3 scripts/query_postgres.py observations 11 --limit 5 --json
+    Examples:
+        python -m scripts.query_postgres search "real gdp"
+        python -m scripts.query_postgres search "real gdp" --json
+        python -m scripts.query_postgres summary 11
+        python -m scripts.query_postgres summary-by-indicator GGO_GBR GRT_G14_GG_XDC --series-id 123
+        python -m scripts.query_postgres observations 11 --limit 5
+        python -m scripts.query_postgres observations-by-indicator GGO_GBR GRT_G14_GG_XDC --series-id 123 --limit 5
     """
     parser = argparse.ArgumentParser(
         description="Query the local ONS SDMX Postgres database."
@@ -619,8 +724,8 @@ def build_parser() -> argparse.ArgumentParser:
     search_parser.add_argument("query")
     search_parser.add_argument("--limit", type=int, default=10)
     search_parser.add_argument(
-    "--dataset-id",
-    help="Optional dataset ID to restrict search, for example CPI_GBR.",
+        "--dataset-id",
+        help="Optional dataset ID to restrict search, for example CPI_GBR.",
     )
     search_parser.add_argument("--json", action="store_true")
 
@@ -637,11 +742,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     summary_by_indicator_parser.add_argument("dataset_id")
     summary_by_indicator_parser.add_argument("indicator_code")
+    summary_by_indicator_parser.add_argument(
+        "--series-id",
+        type=int,
+        default=None,
+        help="Optional exact series ID to disambiguate annual/quarterly variants.",
+    )
     summary_by_indicator_parser.add_argument("--json", action="store_true")
 
     observations_parser = subparsers.add_parser(
         "observations",
-        help="Show observations for one series.",
+        help="Show observations for one exact series.",
     )
     observations_parser.add_argument("series_id", type=int)
     observations_parser.add_argument("--limit", type=int, default=10)
@@ -653,6 +764,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     observations_by_indicator_parser.add_argument("dataset_id")
     observations_by_indicator_parser.add_argument("indicator_code")
+    observations_by_indicator_parser.add_argument(
+        "--series-id",
+        type=int,
+        default=None,
+        help="Optional exact series ID to disambiguate annual/quarterly variants.",
+    )
     observations_by_indicator_parser.add_argument("--limit", type=int, default=10)
     observations_by_indicator_parser.add_argument("--json", action="store_true")
 
@@ -665,20 +782,20 @@ def main() -> None:
 
     if args.command == "search":
         rows = search_series(
-                args.query,
-                args.limit,
-                dataset_id=args.dataset_id,
-            )
-
-        response = build_search_response(
             args.query,
             args.limit,
-            rows,
             dataset_id=args.dataset_id,
         )
 
         if args.json:
-            print_json(build_search_response(args.query, args.limit, rows))
+            print_json(
+                build_search_response(
+                    args.query,
+                    args.limit,
+                    rows,
+                    dataset_id=args.dataset_id,
+                )
+            )
         else:
             print_search_results(rows)
 
@@ -694,6 +811,7 @@ def main() -> None:
         row = get_series_summary_by_indicator(
             args.dataset_id,
             args.indicator_code,
+            series_id=args.series_id,
         )
 
         if args.json:
@@ -719,7 +837,8 @@ def main() -> None:
         rows = get_series_observations_by_indicator(
             args.dataset_id,
             args.indicator_code,
-            args.limit,
+            series_id=args.series_id,
+            limit=args.limit,
         )
 
         if args.json:

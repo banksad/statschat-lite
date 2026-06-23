@@ -24,7 +24,6 @@ from scripts.query_postgres import (
     list_series_for_dataset,
     search_series,
 )
-
 from scripts.semantic_search_backend import (
     DEFAULT_SEMANTIC_DIMENSION,
     DEFAULT_SEMANTIC_MODEL,
@@ -49,6 +48,7 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
+
 def safe_filename_component(value: str) -> str:
     """
     Convert a public identifier into a safe filename component.
@@ -60,6 +60,54 @@ def safe_filename_component(value: str) -> str:
     cleaned = cleaned.strip("-")
 
     return cleaned or "series"
+
+
+def optional_series_id_query(
+    series_id: Any | None,
+    separator: str,
+) -> str:
+    """
+    Build an optional series_id query-string fragment.
+
+    Example:
+      optional_series_id_query(123, "?") -> "?series_id=123"
+      optional_series_id_query(123, "&") -> "&series_id=123"
+      optional_series_id_query(None, "&") -> ""
+    """
+    if series_id in (None, ""):
+        return ""
+
+    return f"{separator}series_id={quote(str(series_id), safe='')}"
+
+
+def build_series_resource_urls(
+    dataset_id: str,
+    indicator_code: str,
+    series_id: Any | None = None,
+) -> dict[str, str]:
+    """
+    Build internal API URLs for one series.
+
+    When series_id is present, the URLs point to an exact series row rather
+    than only an indicator code. This matters when one indicator exists at
+    multiple frequencies, such as annual and quarterly GGO series.
+    """
+    encoded_dataset_id = quote(dataset_id, safe="")
+    encoded_indicator_code = quote(indicator_code, safe="")
+
+    metadata_base_url = (
+        f"/v1/datasets/{encoded_dataset_id}"
+        f"/series/by-indicator/{encoded_indicator_code}"
+    )
+
+    return {
+        "metadata_url": metadata_base_url
+        + optional_series_id_query(series_id, separator="?"),
+        "observations_url": f"{metadata_base_url}/observations?limit=20"
+        + optional_series_id_query(series_id, separator="&"),
+        "observations_csv_url": f"{metadata_base_url}/observations.csv?limit=10000"
+        + optional_series_id_query(series_id, separator="&"),
+    }
 
 
 def build_observations_csv(
@@ -75,6 +123,7 @@ def build_observations_csv(
     output = io.StringIO()
 
     fieldnames = [
+        "series_id",
         "dataset_id",
         "dataset_title",
         "series_key",
@@ -96,6 +145,7 @@ def build_observations_csv(
     for observation in observations:
         writer.writerow(
             {
+                "series_id": summary.get("series_id"),
                 "dataset_id": summary.get("dataset_id"),
                 "dataset_title": summary.get("dataset_title"),
                 "series_key": summary.get("series_key"),
@@ -292,9 +342,7 @@ def search_page(request: Request) -> HTMLResponse:
 @app.get("/browse", response_class=HTMLResponse)
 def browse_page(request: Request) -> HTMLResponse:
     """
-    Placeholder Browse page.
-
-    This will become the structured discovery tree.
+    Structured Browse page.
     """
     return templates.TemplateResponse(
         request=request,
@@ -303,6 +351,7 @@ def browse_page(request: Request) -> HTMLResponse:
             "active_nav": "browse",
         },
     )
+
 
 @app.get("/browse/datasets/{dataset_id}", response_class=HTMLResponse)
 def browse_dataset_page(
@@ -366,6 +415,7 @@ def browse_dataset_page(
         },
     )
 
+
 @app.get("/api", response_class=HTMLResponse)
 def api_page(request: Request) -> HTMLResponse:
     """
@@ -383,19 +433,27 @@ def api_page(request: Request) -> HTMLResponse:
 @app.get("/series/{dataset_id}/{indicator_code}", response_class=HTMLResponse)
 def series_page(
     request: Request,
-    dataset_id: str = Path(
-        ...,
-        description="Dataset ID, for example NAG_GBR.",
-    ),
-    indicator_code: str = Path(
-        ...,
-        description="SDMX indicator code, for example NGDP_R_SA_XDC.",
+    dataset_id: str,
+    indicator_code: str,
+    series_id: int | None = Query(
+        None,
+        description=(
+            "Optional exact series ID. Use this when one indicator has annual "
+            "and quarterly variants."
+        ),
     ),
 ) -> HTMLResponse:
     """
-    Friendly browser page for one series.
+    Friendly browser page for one exact series.
+
+    Public URLs still use dataset_id and indicator_code, but series_id can be
+    supplied to disambiguate annual/quarterly variants.
     """
-    summary = get_series_summary_by_indicator(dataset_id, indicator_code)
+    summary = get_series_summary_by_indicator(
+        dataset_id,
+        indicator_code,
+        series_id=series_id,
+    )
 
     if summary is None:
         raise HTTPException(
@@ -406,28 +464,29 @@ def series_page(
             ),
         )
 
+    resolved_series_id = summary.get("series_id") or series_id
+
     table_observations = get_series_observations_by_indicator(
         dataset_id,
         indicator_code,
-        20,
+        series_id=series_id,
+        limit=20,
     )
 
     chart_observations = get_series_observations_by_indicator(
         dataset_id,
         indicator_code,
-        500,
+        series_id=series_id,
+        limit=500,
     )
 
     chart = build_line_chart_data(chart_observations)
 
-    encoded_dataset_id = quote(dataset_id, safe="")
-    encoded_indicator_code = quote(indicator_code, safe="")
-    metadata_url = (
-        f"/v1/datasets/{encoded_dataset_id}"
-        f"/series/by-indicator/{encoded_indicator_code}"
+    urls = build_series_resource_urls(
+        dataset_id=dataset_id,
+        indicator_code=indicator_code,
+        series_id=resolved_series_id,
     )
-    observations_url = f"{metadata_url}/observations?limit=20"
-    observations_csv_url = f"{metadata_url}/observations.csv?limit=10000"
 
     return templates.TemplateResponse(
         request=request,
@@ -436,9 +495,9 @@ def series_page(
             "summary": summary,
             "observations": table_observations,
             "chart": chart,
-            "metadata_url": metadata_url,
-            "observations_url": observations_url,
-            "observations_csv_url": observations_csv_url,
+            "metadata_url": urls["metadata_url"],
+            "observations_url": urls["observations_url"],
+            "observations_csv_url": urls["observations_csv_url"],
             "active_nav": "search",
         },
     )
@@ -491,6 +550,7 @@ def list_datasets_endpoint() -> dict[str, Any]:
         "count": len(rows),
         "datasets": rows,
     }
+
 
 @app.get("/v1/datasets/{dataset_id}")
 def get_dataset_endpoint(
@@ -683,13 +743,25 @@ def get_series_by_indicator_endpoint(
         ...,
         description="SDMX indicator code, for example NGDP_R_SA_XDC.",
     ),
+    series_id: int | None = Query(
+        None,
+        description=(
+            "Optional exact series ID. Use this when one indicator has annual "
+            "and quarterly variants."
+        ),
+    ),
 ) -> dict[str, Any]:
     """
     Return summary metadata for one series using public identifiers.
 
-    This endpoint avoids requiring public users to know the internal series_id.
+    Public users can use dataset_id and indicator_code. When that pair is
+    ambiguous, series_id can disambiguate the exact annual or quarterly series.
     """
-    row = get_series_summary_by_indicator(dataset_id, indicator_code)
+    row = get_series_summary_by_indicator(
+        dataset_id,
+        indicator_code,
+        series_id=series_id,
+    )
 
     if row is None:
         raise HTTPException(
@@ -721,6 +793,13 @@ def get_series_observations_by_indicator_endpoint(
         le=500,
         description="Maximum number of observations to return.",
     ),
+    series_id: int | None = Query(
+        None,
+        description=(
+            "Optional exact series ID. Use this when one indicator has annual "
+            "and quarterly variants."
+        ),
+    ),
 ) -> dict[str, Any]:
     """
     Return observations for one series using public identifiers.
@@ -728,7 +807,11 @@ def get_series_observations_by_indicator_endpoint(
     Example:
         /v1/datasets/NAG_GBR/series/by-indicator/NGDP_R_SA_XDC/observations?limit=5
     """
-    summary = get_series_summary_by_indicator(dataset_id, indicator_code)
+    summary = get_series_summary_by_indicator(
+        dataset_id,
+        indicator_code,
+        series_id=series_id,
+    )
 
     if summary is None:
         raise HTTPException(
@@ -742,15 +825,21 @@ def get_series_observations_by_indicator_endpoint(
     rows = get_series_observations_by_indicator(
         dataset_id,
         indicator_code,
-        limit,
+        series_id=series_id,
+        limit=limit,
     )
 
-    return build_observations_by_indicator_response(
+    response = build_observations_by_indicator_response(
         dataset_id,
         indicator_code,
         limit,
         rows,
     )
+
+    response["series_id"] = summary.get("series_id")
+
+    return response
+
 
 @app.get(
     "/v1/datasets/{dataset_id}/series/by-indicator/{indicator_code}/observations.csv"
@@ -770,6 +859,13 @@ def get_series_observations_by_indicator_csv_endpoint(
         le=100000,
         description="Maximum number of observations to include in the CSV.",
     ),
+    series_id: int | None = Query(
+        None,
+        description=(
+            "Optional exact series ID. Use this when one indicator has annual "
+            "and quarterly variants."
+        ),
+    ),
 ) -> Response:
     """
     Return observations for one series as CSV.
@@ -777,7 +873,11 @@ def get_series_observations_by_indicator_csv_endpoint(
     This is a lightweight export endpoint. It keeps the same source-backed
     identity model as the JSON observations endpoint.
     """
-    summary = get_series_summary_by_indicator(dataset_id, indicator_code)
+    summary = get_series_summary_by_indicator(
+        dataset_id,
+        indicator_code,
+        series_id=series_id,
+    )
 
     if summary is None:
         raise HTTPException(
@@ -791,14 +891,25 @@ def get_series_observations_by_indicator_csv_endpoint(
     rows = get_series_observations_by_indicator(
         dataset_id,
         indicator_code,
-        limit,
+        series_id=series_id,
+        limit=limit,
     )
 
     csv_text = build_observations_csv(summary, rows)
 
     safe_dataset_id = safe_filename_component(dataset_id)
     safe_indicator_code = safe_filename_component(indicator_code)
-    filename = f"{safe_dataset_id}-{safe_indicator_code}-observations.csv"
+
+    resolved_series_id = summary.get("series_id") or series_id
+
+    if resolved_series_id is not None:
+        safe_series_id = safe_filename_component(str(resolved_series_id))
+        filename = (
+            f"{safe_dataset_id}-{safe_indicator_code}"
+            f"-series-{safe_series_id}-observations.csv"
+        )
+    else:
+        filename = f"{safe_dataset_id}-{safe_indicator_code}-observations.csv"
 
     return Response(
         content=csv_text,

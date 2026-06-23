@@ -61,103 +61,114 @@
       </dl>
     </section>
 
-	<section class="dataset-actions">
-	  <form class="dataset-search-form" action="/browse/datasets/{{ dataset.dataset_id }}" method="get">
-	    <label for="dataset-search-query">
-	      Search within this dataset
-	    </label>
+    <section class="dataset-actions">
+      <form class="dataset-search-form" action="/browse/datasets/{{ dataset.dataset_id }}" method="get">
+        <label for="dataset-search-query">
+          Search within this dataset
+        </label>
 
-	    <div class="inline-form-row">
-	      <input
-		id="dataset-search-query"
-		name="q"
-		type="search"
-		value="{{ search_query or '' }}"
-		placeholder="Try exports, real GDP, household spending..."
-	      >
-	      <button type="submit">Search</button>
-	    </div>
-	  </form>
-	</section>
+        <div class="inline-form-row">
+          <input
+            id="dataset-search-query"
+            name="q"
+            type="search"
+            value="{{ search_query or '' }}"
+            placeholder="Try exports, real GDP, household spending..."
+          >
+          <button type="submit">Search</button>
+        </div>
+      </form>
+    </section>
 
-	{% if search_query %}
-	<section class="card">
-	  <h2>Top matches for "{{ search_query }}"</h2>
+    {% if search_query %}
+    <section class="card">
+      <h2>Top matches for "{{ search_query }}"</h2>
 
-	  {% if search_error %}
-	    <p class="muted">
-	      Semantic search is not available: {{ search_error }}
-	    </p>
-	  {% elif search_results %}
-	    <p class="muted">
-	      Showing the top {{ search_results|length }} semantic matches in this dataset.
-	    </p>
+      {% if search_error %}
+        <p class="muted">
+          Semantic search is not available: {{ search_error }}
+        </p>
+      {% elif search_results %}
+        <p class="muted">
+          Showing the top {{ search_results|length }} semantic matches in this dataset.
+        </p>
 
-	    <div class="table-scroll">
-	      <table class="series-table">
-		<thead>
-		  <tr>
-		    <th>Series</th>
-		    <th>Type</th>
-		    <th>Adjustment</th>
-		    <th>Period</th>
-		    <th>Score</th>
-		    <th>Open</th>
-		  </tr>
-		</thead>
+        <div class="table-scroll">
+          <table class="series-table">
+            <thead>
+              <tr>
+                <th>Series</th>
+                <th>Type</th>
+                <th>Adjustment</th>
+                <th>Period</th>
+                <th>Score</th>
+                <th>Open</th>
+              </tr>
+            </thead>
 
-		<tbody>
-		  {% for item in search_results %}
-		  <tr>
-		    <td class="series-title-cell">
-		      <a
-			class="series-main-name"
-			href="/series/{{ item.dataset_id }}/{{ item.indicator_code }}"
-		      >
-			{{ item.display_name or item.primary_text or item.indicator_name or item.indicator_code }}
-		      </a>
+            <tbody>
+              {% for item in search_results %}
+              {% set series_query = "?series_id=" ~ item.series_id if item.series_id else "" %}
+              <tr>
+                <td class="series-title-cell">
+                  <a
+                    class="series-main-name"
+                    href="/series/{{ item.dataset_id }}/{{ item.indicator_code }}{{ series_query }}"
+                  >
+                    {{ item.display_name or item.primary_text or item.indicator_name or item.indicator_code }}
+                  </a>
 
-		      {% if item.indicator_name %}
-			<div class="series-official-name">
-			  Official label: {{ item.indicator_name }}
-			</div>
-		      {% endif %}
+                  {% if item.indicator_name %}
+                    <div class="series-official-name">
+                      Official label: {{ item.indicator_name }}
+                    </div>
+                  {% endif %}
 
-		      <div class="series-code">
-			Code: <span class="code">{{ item.indicator_code }}</span>
-		      </div>
-		    </td>
+                  <div class="series-code">
+                    Code: <span class="code">{{ item.indicator_code }}</span>
+                  </div>
 
-		    <td>{{ item.measure_type or "—" }}</td>
-		    <td>{{ item.seasonal_adjustment or "—" }}</td>
+                  {% if item.frequency_name or item.frequency_code %}
+                    <div class="muted">
+                      {{ item.frequency_name or item.frequency_code }}
+                    </div>
+                  {% endif %}
+                </td>
 
-		    <td>
-		      {% if item.first_period and item.latest_period %}
-			{{ item.first_period }} to {{ item.latest_period }}
-		      {% else %}
-			—
-		      {% endif %}
-		    </td>
+                <td>{{ item.measure_type or "—" }}</td>
+                <td>{{ item.seasonal_adjustment or "—" }}</td>
 
-		    <td class="numeric">
-		      {{ "%.3f"|format(item.similarity_score) }}
-		    </td>
+                <td>
+                  {% if item.first_period and item.latest_period %}
+                    {{ item.first_period }} to {{ item.latest_period }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
 
-		    <td>
-		      <a href="/series/{{ item.dataset_id }}/{{ item.indicator_code }}">
-			View
-		      </a>
-		    </td>
-		  </tr>
-		  {% endfor %}
-		</tbody>
-	      </table>
-	    </div>
-	  {% else %}
-	    <p>No semantic matches found in this dataset.</p>
-	  {% endif %}
-	</section>
-	{% endif %}
+                <td class="numeric">
+                  {% if item.similarity_score is not none %}
+                    {{ "%.3f"|format(item.similarity_score|float) }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+
+                <td>
+                  <a href="/series/{{ item.dataset_id }}/{{ item.indicator_code }}{{ series_query }}">
+                    View
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p>No semantic matches found in this dataset.</p>
+      {% endif %}
+    </section>
+    {% endif %}
 
     <section class="card">
       <h2>Source and provenance</h2>
@@ -235,12 +246,13 @@
 
             <tbody>
               {% for item in series %}
+              {% set series_query = "?series_id=" ~ item.series_id if item.series_id else "" %}
               <tr>
                 <td class="series-title-cell">
                   {% if item.indicator_code %}
                     <a
                       class="series-main-name"
-                      href="/series/{{ item.dataset_id }}/{{ item.indicator_code }}"
+                      href="/series/{{ item.dataset_id }}/{{ item.indicator_code }}{{ series_query }}"
                     >
                       {{ item.display_name or item.indicator_name or item.indicator_code }}
                     </a>
@@ -259,6 +271,12 @@
                   {% if item.indicator_code %}
                     <div class="series-code">
                       Code: <span class="code">{{ item.indicator_code }}</span>
+                    </div>
+                  {% endif %}
+
+                  {% if item.frequency_name or item.frequency_code %}
+                    <div class="muted">
+                      {{ item.frequency_name or item.frequency_code }}
                     </div>
                   {% endif %}
                 </td>
@@ -305,7 +323,7 @@
 
                 <td>
                   {% if item.indicator_code %}
-                    <a href="/v1/datasets/{{ item.dataset_id }}/series/by-indicator/{{ item.indicator_code }}/observations.csv?limit=10000">
+                    <a href="/v1/datasets/{{ item.dataset_id }}/series/by-indicator/{{ item.indicator_code }}/observations.csv?limit=10000{% if item.series_id %}&series_id={{ item.series_id }}{% endif %}">
                       CSV
                     </a>
                   {% else %}
