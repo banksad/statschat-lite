@@ -8,7 +8,7 @@ from google import genai
 from google.genai.types import EmbedContentConfig
 
 from app.services.postgres import get_connection
-from scripts.series_sql import (
+from app.services.series_sql import (
     OBSERVATION_SUMMARY_CTE,
     OBSERVATION_SUMMARY_SELECT,
     display_name_select,
