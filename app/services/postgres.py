@@ -8,7 +8,7 @@ from typing import Any
 import psycopg
 from psycopg.rows import dict_row
 
-from scripts.series_sql import (
+from app.services.series_sql import (
     OBSERVATION_SUMMARY_CTE,
     OBSERVATION_SUMMARY_SELECT,
     dataset_series_metadata_select,
