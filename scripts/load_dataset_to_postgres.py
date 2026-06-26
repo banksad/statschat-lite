@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -11,12 +10,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from scripts.dataset_registry import get_dataset_config
-
-
-DB_DSN = os.environ.get(
-    "ONS_SDMX_DB_DSN",
-    "postgresql://ons_sdmx_user:ons_sdmx_password@localhost:5433/ons_sdmx",
-)
+from scripts.query_postgres import get_dsn
 
 
 def load_json(path: Path) -> Any:
@@ -244,7 +238,7 @@ def load_dataset_to_postgres(dataset_id: str) -> None:
     print()
     print("Connecting to Postgres...")
 
-    with psycopg.connect(DB_DSN) as conn:
+    with psycopg.connect(get_dsn()) as conn:
         with conn.cursor() as cur:
             print("Inserting dataset...")
             insert_dataset(cur, dataset_config)
