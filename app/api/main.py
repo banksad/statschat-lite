@@ -15,7 +15,7 @@ from fastapi.templating import Jinja2Templates
 
 from pydantic import BaseModel
 
-from scripts.query_postgres import (
+from app.services.query_postgres import (
     build_observations_by_indicator_response,
     build_search_response,
     get_database_health,
@@ -27,13 +27,13 @@ from scripts.query_postgres import (
     search_series,
 )
 
-from scripts.semantic_search_backend import (
+from app.services.semantic_search_backend import (
     DEFAULT_SEMANTIC_DIMENSION,
     DEFAULT_SEMANTIC_MODEL,
     semantic_search_series,
 )
 
-from scripts.chat_backend import ask_chat, build_chat_retrieval_bundle
+from app.services.chat_backend import ask_chat, build_chat_retrieval_bundle
 
 
 BASE_DIR = FilePath(__file__).resolve().parents[2]
