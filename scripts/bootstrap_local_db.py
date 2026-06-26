@@ -8,28 +8,12 @@ from pathlib import Path
 
 import psycopg
 
+from scripts.query_postgres import get_dsn
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = PROJECT_ROOT / "sql" / "001_create_core_tables.sql"
 DATASETS_CONFIG_PATH = PROJECT_ROOT / "config" / "datasets.json"
-
-
-def get_dsn() -> str:
-    """
-    Return the database connection string from the environment.
-
-    We deliberately do not hardcode the username/password here because this
-    project is intended to live in a public repository.
-    """
-    dsn = os.environ.get("ONS_SDMX_DB_DSN")
-
-    if not dsn:
-        raise RuntimeError(
-            "ONS_SDMX_DB_DSN is not set. "
-            "Create a local .env file or export the variable before running bootstrap."
-        )
-
-    return dsn
 
 
 def apply_schema(dsn: str) -> None:
