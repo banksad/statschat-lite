@@ -9,17 +9,20 @@ import psycopg
 from psycopg.rows import dict_row
 
 
-DB_DSN = os.environ.get(
-    "ONS_SDMX_DB_DSN",
-    "postgresql://ons_sdmx_user:ons_sdmx_password@localhost:5433/ons_sdmx",
-)
-
-
 def get_dsn() -> str:
+    """
+    Return the database connection string from the environment.
+
+    All database entry points use the same configuration contract: callers must
+    set ONS_SDMX_DB_DSN explicitly rather than relying on an implicit fallback.
+    """
     dsn = os.environ.get("ONS_SDMX_DB_DSN")
 
     if not dsn:
-        raise RuntimeError("ONS_SDMX_DB_DSN is not set")
+        raise RuntimeError(
+            "ONS_SDMX_DB_DSN is not set. "
+            "Create a local .env file or export the variable before connecting to Postgres."
+        )
 
     return dsn
 
@@ -31,7 +34,7 @@ def get_connection() -> psycopg.Connection:
     row_factory=dict_row means query results behave like dictionaries,
     so we can use row["series_id"] instead of row[0].
     """
-    return psycopg.connect(DB_DSN, row_factory=dict_row)
+    return psycopg.connect(get_dsn(), row_factory=dict_row)
 
 
 def get_database_health() -> dict[str, int]:
@@ -43,7 +46,7 @@ def get_database_health() -> dict[str, int]:
 
     counts: dict[str, int] = {}
 
-    with psycopg.connect(get_dsn()) as conn:
+    with get_connection() as conn:
         with conn.cursor() as cur:
             for label, query in queries.items():
                 cur.execute(query)
