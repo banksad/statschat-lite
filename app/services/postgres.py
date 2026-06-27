@@ -58,7 +58,7 @@ def get_dsn() -> str:
             )
 
         return (
-            f"postgresql://{quote(user)}:{quote(password)}@/{quote(database)}"
+            f"postgresql://{quote(user, safe='')}:{quote(password, safe='')}@/{quote(database, safe='')}"
             f"?host=/cloudsql/{quote(cloud_sql_instance, safe=':')}"
         )
 
