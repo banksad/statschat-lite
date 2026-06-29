@@ -24,3 +24,6 @@ pretty/
 .DS_Store
 # Tool caches
 .ruff_cache/
+
+# Local deployment tools
+cloud-sql-proxy
